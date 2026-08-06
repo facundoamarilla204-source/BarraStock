@@ -12,11 +12,14 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!node_modules/.prisma/**/*'
   - '!node_modules/@prisma/**/*'
+  - '!node_modules/prisma/**/*'
 extraResources:
   - from: "node_modules/@prisma"
     to: "node_modules/@prisma"
   - from: "node_modules/.prisma"
     to: "node_modules/.prisma"
+  - from: "node_modules/prisma"
+    to: "node_modules/prisma"
   - from: "prisma/template.db"
     to: "template.db"
   - from: "prisma/schema.prisma"

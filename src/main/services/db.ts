@@ -82,6 +82,13 @@ async function baselineDirtyDatabase() {
         `ALTER TABLE Producto ADD COLUMN unidadMedida TEXT NOT NULL DEFAULT 'unidad'`,
         `ALTER TABLE Producto ADD COLUMN tamanioEnvase REAL`,
         `ALTER TABLE Producto ADD COLUMN vendiblePorUnidad INTEGER NOT NULL DEFAULT 1`,
+        `ALTER TABLE Configuracion ADD COLUMN controlIva BOOLEAN NOT NULL DEFAULT false`,
+        `ALTER TABLE Configuracion ADD COLUMN ivaPorcentaje REAL NOT NULL DEFAULT 21.0`,
+        `ALTER TABLE Venta ADD COLUMN neto REAL`,
+        `ALTER TABLE Venta ADD COLUMN iva REAL`,
+        `ALTER TABLE Venta ADD COLUMN ivaPorcentaje REAL`,
+        `ALTER TABLE DetalleVenta ADD COLUMN neto REAL`,
+        `ALTER TABLE DetalleVenta ADD COLUMN iva REAL`,
       ]
       
       for (const statement of alterStatements) {
@@ -133,7 +140,7 @@ function runPrismaCommand(args: string[]): Promise<void> {
     let prismaPath = ''
     
     if (isProd) {
-      prismaPath = path.join(process.resourcesPath, 'app.asar', 'node_modules', 'prisma', 'build', 'index.js')
+      prismaPath = path.join(process.resourcesPath, 'node_modules', 'prisma', 'build', 'index.js')
     } else {
       prismaPath = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js')
     }
