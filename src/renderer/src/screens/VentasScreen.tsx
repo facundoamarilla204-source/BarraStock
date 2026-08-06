@@ -20,7 +20,7 @@ export function VentasScreen() {
 
   const handleAnular = async (id: string) => {
     try {
-      const res = await (window as any).api.anularVenta(id, 'Anulada por usuario en interfaz')
+      await (window as any).api.anularVenta(id, 'Anulada por usuario en interfaz')
       // Note: anularVenta in ventaService returns the updated venta directly,
       // or throws an error. Let's check if it returns {success: true} or just the object.
       // Wait, in `main/ipc/ventas.ts` it might wrap in {success, error}. But if it throws we catch it.

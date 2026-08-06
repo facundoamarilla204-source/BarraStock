@@ -50,12 +50,12 @@ function PantallaActivacion() {
     setError(null)
 
     try {
-      const res = await (window as any).api.activarLicencia(values.email, values.codigo)
+      const res = await (window as any).api.activarLicencia(values.codigo, values.email)
 
       if (res.success) {
         navigate('/', { replace: true })
       } else {
-        setError(res.error || 'Error desconocido al validar licencia.')
+        setError(res.message || res.error || 'Error desconocido al validar licencia.')
       }
     } catch (err: any) {
       setError(err.message)

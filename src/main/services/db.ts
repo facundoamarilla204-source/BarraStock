@@ -23,10 +23,8 @@ if (isProd) {
     }
   }
 
-  // En producción, PrismaClient necesita saber dónde está el query engine si lo movemos
-  // En este caso electron-vite + builder a veces pierden la ruta del engine.
-  // Configuramos la variable de entorno para que apunte al engine copiado en extraResources
-  process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(process.resourcesPath, 'prisma-engine', 'query_engine-windows.dll.node')
+  // En producción, PrismaClient encontrará el query engine automáticamente
+  // porque hemos copiado node_modules/.prisma y node_modules/@prisma a process.resourcesPath
   
   prismaUrl = `file:${dbPath}`
 } else {
@@ -49,3 +47,51 @@ export const prisma =
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
+export async function runAutoMigrations() {
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE Venta ADD COLUMN numero INTEGER`)
+    console.log('Migración exitosa: Venta.numero agregada')
+  } catch (e) {}
+
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE Venta ADD COLUMN cajaSesionId TEXT`)
+    console.log('Migración exitosa: Venta.cajaSesionId agregada')
+  } catch (e) {}
+
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "CajaSesion" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "numero" INTEGER NOT NULL,
+          "fondoInicial" REAL NOT NULL DEFAULT 0,
+          "fechaApertura" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "fechaCierre" DATETIME,
+          "totalEfectivo" REAL,
+          "totalTransferencia" REAL,
+          "totalVentas" REAL,
+          "totalEsperadoCaja" REAL,
+          "cantidadVentas" INTEGER,
+          "cantidadAnuladas" INTEGER,
+          "estado" TEXT NOT NULL DEFAULT 'abierta'
+      )
+    `)
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "CajaSesion_numero_key" ON "CajaSesion"("numero")`)
+    console.log('Migración exitosa: Tabla CajaSesion creada')
+  } catch (e) {}
+
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE Producto ADD COLUMN unidadMedida TEXT NOT NULL DEFAULT 'unidad'`)
+    console.log('Migración exitosa: Producto.unidadMedida agregada')
+  } catch (e) {}
+
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE Producto ADD COLUMN tamanioEnvase REAL`)
+    console.log('Migración exitosa: Producto.tamanioEnvase agregada')
+  } catch (e) {}
+
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE Producto ADD COLUMN vendiblePorUnidad INTEGER NOT NULL DEFAULT 1`)
+    console.log('Migración exitosa: Producto.vendiblePorUnidad agregada')
+  } catch (e) {}
+}

@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipcHandlers'
 import { setupAutoUpdater, checkForUpdatesSilently } from './updaterService'
+import { runAutoMigrations } from './services/db'
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -42,9 +43,16 @@ function createWindow(): BrowserWindow {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
+  
+  try {
+    await runAutoMigrations()
+  } catch (err) {
+    console.error('Error in runAutoMigrations:', err)
+  }
 
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils

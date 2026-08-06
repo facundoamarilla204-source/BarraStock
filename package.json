@@ -1,7 +1,7 @@
 {
-  "name": "barrastock-tmp",
-  "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
+  "name": "barrastock",
+  "version": "1.0.6",
+  "description": "BarraStock - Sistema de Gestión de Bares",
   "main": "./out/main/index.js",
   "author": "example.com",
   "homepage": "https://electron-vite.org",

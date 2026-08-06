@@ -10,13 +10,13 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  - 'node_modules/.prisma/**/*'
-  - 'node_modules/@prisma/client/**/*'
-asarUnpack:
-  - resources/**
+  - '!node_modules/.prisma/**/*'
+  - '!node_modules/@prisma/**/*'
 extraResources:
-  - from: "node_modules/@prisma/engines/query_engine-windows.dll.node"
-    to: "prisma-engine/query_engine-windows.dll.node"
+  - from: "node_modules/@prisma"
+    to: "node_modules/@prisma"
+  - from: "node_modules/.prisma"
+    to: "node_modules/.prisma"
   - from: "prisma/template.db"
     to: "template.db"
 win:
