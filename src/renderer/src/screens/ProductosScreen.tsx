@@ -40,8 +40,11 @@ export function ProductosScreen() {
     vendiblePorUnidad: true
   })
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [ivaInfo, setIvaInfo] = useState({ activo: false, porcentaje: 21 })
 
   const loadData = async () => {
+    const config = await (window as any).api.getConfiguracion()
+    setIvaInfo({ activo: config?.ivaActivo ?? false, porcentaje: config?.ivaPorcentaje ?? 21 })
     const data = await (window as any).api.getProductos()
     setProductos(data)
   }
@@ -232,6 +235,11 @@ export function ProductosScreen() {
                     setFormData({ ...formData, precio: parseFloat(e.target.value) || 0 })
                   }
                 />
+                {ivaInfo.activo && (
+                  <p className="text-xs text-blue-400 mt-1">
+                    Precio sin IVA. Se sumará automáticamente un {ivaInfo.porcentaje}% al vender.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Costo (opcional)</Label>

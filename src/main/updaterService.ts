@@ -58,6 +58,10 @@ export async function checkUpdatesManual(): Promise<{ success: boolean; status: 
     return { success: true, status: 'up-to-date' }
   } catch (error: any) {
     log.warn('[Updater] Manual check error:', error.message)
+    const errorString = String(error.message || '').toLowerCase()
+    if (errorString.includes('403') || errorString.includes('rate limit')) {
+      return { success: false, status: 'rate_limit' }
+    }
     return { success: false, status: 'error' }
   }
 }

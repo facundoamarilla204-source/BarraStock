@@ -10,6 +10,7 @@ export function POSScreen() {
   const [search, setSearch] = useState('')
   const [categoria, setCategoria] = useState<string | null>(null)
   const [montoRecibido, setMontoRecibido] = useState<string>('')
+  const [ivaInfo, setIvaInfo] = useState({ activo: false, porcentaje: 21 })
   
   const cart = useCartStore()
   
@@ -24,6 +25,11 @@ export function POSScreen() {
   }, [cart.items, cart.metodoPago])
 
   const loadData = async () => {
+    const config = await (window as any).api.getConfiguracion()
+    const ivaActivo = config?.ivaActivo ?? false
+    const ivaPorcentaje = config?.ivaPorcentaje ?? 21
+    setIvaInfo({ activo: ivaActivo, porcentaje: ivaPorcentaje })
+
     const prods = await (window as any).api.getProductos()
     const recs = await (window as any).api.getRecetas()
     
@@ -38,7 +44,8 @@ export function POSScreen() {
         } else {
           maxStock = p.stock
         }
-        return { ...p, tipo: 'producto', maxStock }
+        const precioFinal = ivaActivo ? p.precio * (1 + ivaPorcentaje / 100) : p.precio
+        return { ...p, tipo: 'producto', maxStock, precioNeto: p.precio, precio: precioFinal }
       })
 
     const recetasDisponibles = recs.map((r: any) => {
@@ -52,7 +59,8 @@ export function POSScreen() {
       } else {
         maxStock = 0
       }
-      return { ...r, tipo: 'receta', maxStock }
+      const precioFinal = ivaActivo ? r.precio * (1 + ivaPorcentaje / 100) : r.precio
+      return { ...r, tipo: 'receta', maxStock, precioNeto: r.precio, precio: precioFinal }
     })
 
     setItems([...productosVendibles, ...recetasDisponibles])
@@ -226,6 +234,18 @@ export function POSScreen() {
         </ScrollArea>
         
         <div className="p-4 bg-gray-950/50 border-t border-gray-800 rounded-b-lg space-y-4">
+          {ivaInfo.activo && cart.items.length > 0 && (
+            <div className="flex flex-col gap-1 text-sm text-gray-400 mb-2 border-b border-gray-800 pb-2">
+              <div className="flex justify-between">
+                <span>Subtotal (Neto):</span>
+                <span>${(cart.getTotal() / (1 + ivaInfo.porcentaje / 100)).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>IVA ({ivaInfo.porcentaje}%):</span>
+                <span>${(cart.getTotal() - (cart.getTotal() / (1 + ivaInfo.porcentaje / 100))).toFixed(2)}</span>
+              </div>
+            </div>
+          )}
           <div className="flex justify-between items-center text-2xl font-bold">
             <span>Total:</span>
             <span className="text-blue-400">${cart.getTotal().toFixed(2)}</span>

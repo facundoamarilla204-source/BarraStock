@@ -47,7 +47,7 @@ export function DashboardScreen() {
 
       const bajas = [
         ...productos
-          .filter((p: any) => p.stock <= threshold)
+          .filter((p: any) => p.stock < threshold)
           .map((p: any) => ({ ...p, tipo: 'Producto' }))
       ]
 

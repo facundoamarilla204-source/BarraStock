@@ -21,8 +21,11 @@ export function RecetasScreen() {
   const [categoria, setCategoria] = useState('trago')
   const [precio, setPrecio] = useState(0)
   const [items, setItems] = useState<any[]>([])
+  const [ivaInfo, setIvaInfo] = useState({ activo: false, porcentaje: 21 })
 
   const loadData = async () => {
+    const config = await (window as any).api.getConfiguracion()
+    setIvaInfo({ activo: config?.ivaActivo ?? false, porcentaje: config?.ivaPorcentaje ?? 21 })
     const data = await (window as any).api.getRecetas()
     setRecetas(data)
   }
@@ -196,6 +199,11 @@ export function RecetasScreen() {
               <div className="space-y-2">
                 <Label>Precio de Venta</Label>
                 <Input type="number" step="0.01" required value={precio} onChange={e => setPrecio(parseFloat(e.target.value))} />
+                {ivaInfo.activo && (
+                  <p className="text-xs text-blue-400 mt-1">
+                    Precio sin IVA. Se sumará automáticamente un {ivaInfo.porcentaje}% al vender.
+                  </p>
+                )}
               </div>
             </div>
 

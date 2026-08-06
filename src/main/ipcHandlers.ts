@@ -6,6 +6,7 @@ import * as licenciaService from './services/licenciaService'
 import * as seedService from './services/seedService'
 import * as ventaService from './services/ventaService'
 import { cajaService } from './services/cajaService'
+import { checkUpdatesManual, relaunchAndUpdate } from './updaterService'
 
 export function registerIpcHandlers() {
   // Test Ping
@@ -112,8 +113,6 @@ export function registerIpcHandlers() {
     const { app } = require('electron')
     return app.getVersion()
   })
-
-  const { checkUpdatesManual, relaunchAndUpdate } = require('./updaterService')
   
   ipcMain.handle('app:check-updates', async () => {
     return await checkUpdatesManual()

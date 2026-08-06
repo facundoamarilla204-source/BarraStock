@@ -59,6 +59,10 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
     throw new Error('Debes abrir una caja primero.')
   }
 
+  const config = await prisma.configuracion.findUnique({ where: { id: 'config' } })
+  const ivaActivo = config?.ivaActivo ?? false
+  const ivaPorcentaje = config?.ivaPorcentaje ?? 21
+
   // Ejecutamos la venta en una transacción para asegurar atomicidad
   return await prisma.$transaction(async (tx) => {
     let totalVenta = 0
@@ -93,15 +97,19 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
           data: { stock: { decrement: descuentoTotal } }
         })
 
-        const subtotal = producto.precio * item.cantidad
+        const subtotalNeto = producto.precio * item.cantidad
+        const itemIva = ivaActivo ? subtotalNeto * (ivaPorcentaje / 100) : 0
+        const subtotal = subtotalNeto + itemIva
         totalVenta += subtotal
 
         detallesData.push({
           tipo: 'producto',
           productoId: producto.id,
           cantidad: item.cantidad,
-          precioUnitario: producto.precio,
-          subtotal
+          precioUnitario: producto.precio + (ivaActivo ? producto.precio * (ivaPorcentaje / 100) : 0),
+          subtotal,
+          neto: subtotalNeto,
+          iva: itemIva
         })
       } else if (item.tipo === 'receta') {
         // Venta de receta (trago/combo)
@@ -132,15 +140,19 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
           })
         }
 
-        const subtotal = receta.precio * item.cantidad
+        const subtotalNeto = receta.precio * item.cantidad
+        const itemIva = ivaActivo ? subtotalNeto * (ivaPorcentaje / 100) : 0
+        const subtotal = subtotalNeto + itemIva
         totalVenta += subtotal
 
         detallesData.push({
           tipo: 'receta',
           recetaId: receta.id,
           cantidad: item.cantidad,
-          precioUnitario: receta.precio,
-          subtotal
+          precioUnitario: receta.precio + (ivaActivo ? receta.precio * (ivaPorcentaje / 100) : 0),
+          subtotal,
+          neto: subtotalNeto,
+          iva: itemIva
         })
       }
     }
@@ -151,12 +163,19 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
     })
     const nextNumero = (maxVenta?.numero || 0) + 1
 
+    // Calcular totales de IVA
+    const totalNeto = detallesData.reduce((acc, d) => acc + d.neto, 0)
+    const totalIva = detallesData.reduce((acc, d) => acc + d.iva, 0)
+
     // Crear la venta
     const venta = await tx.venta.create({
       data: {
         numero: nextNumero,
         cajaSesionId: cajaAbierta.id,
         total: totalVenta,
+        neto: totalNeto,
+        iva: totalIva,
+        ivaPorcentaje: ivaActivo ? ivaPorcentaje : null,
         medioPago,
         estado: 'activa',
         montoRecibido: medioPago === 'efectivo' ? montoRecibido : null,
@@ -315,12 +334,17 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
   let totalRecaudado = 0
   let totalEfectivo = 0
   let totalTransferencia = 0
+  let totalNeto = 0
+  let totalIva = 0
   let cantidadVentas = ventas.length
 
   const itemsMap = new Map<string, { nombre: string, tipo: string, cantidad: number, totalFacturado: number }>()
 
   for (const v of ventas) {
     totalRecaudado += v.total
+    totalNeto += v.neto ?? v.total
+    totalIva += v.iva ?? 0
+
     if (v.medioPago.toLowerCase() === 'efectivo') {
       totalEfectivo += v.total
     } else {
@@ -349,6 +373,8 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
 
   return {
     totalRecaudado,
+    totalNeto,
+    totalIva,
     totalEfectivo,
     totalTransferencia,
     cantidadVentas,

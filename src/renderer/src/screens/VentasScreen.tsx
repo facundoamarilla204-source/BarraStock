@@ -153,7 +153,12 @@ export function VentasScreen() {
                   <TableBody>
                     {selectedVenta.detalles.map((d: any) => (
                       <TableRow key={d.id}>
-                        <TableCell>{d.producto?.nombre || d.receta?.nombre}</TableCell>
+                        <TableCell>
+                          <div>{d.producto?.nombre || d.receta?.nombre}</div>
+                          {d.iva != null && d.iva > 0 && (
+                            <div className="text-xs text-gray-400">Neto: ${d.neto?.toFixed(2)} + IVA: ${d.iva?.toFixed(2)}</div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">{d.cantidad}</TableCell>
                         <TableCell className="text-right">${d.precioUnitario.toFixed(2)}</TableCell>
                         <TableCell className="text-right">${d.subtotal.toFixed(2)}</TableCell>
@@ -164,6 +169,12 @@ export function VentasScreen() {
               </div>
               
               <div className="flex flex-col items-end pt-4 gap-2">
+                {selectedVenta.iva != null && selectedVenta.iva > 0 && (
+                  <div className="text-sm text-gray-400 flex flex-col items-end">
+                    <span>Subtotal Neto: ${selectedVenta.neto?.toFixed(2)}</span>
+                    <span>IVA ({selectedVenta.ivaPorcentaje}%): ${selectedVenta.iva?.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="text-2xl font-bold">
                   Total: ${selectedVenta.total.toFixed(2)}
                 </div>

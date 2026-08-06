@@ -134,6 +134,11 @@ model Venta {
   montoRecibido Float?
   vuelto        Float?
 
+  // IVA
+  neto          Float?
+  iva           Float?
+  ivaPorcentaje Float?
+
   detalles    DetalleVenta[]
 
   @@index([fecha])
@@ -162,6 +167,10 @@ model DetalleVenta {
   precioUnitario Float
   subtotal       Float
 
+  // IVA
+  neto           Float?
+  iva            Float?
+
   @@index([ventaId])
   @@index([productoId])
   @@index([recetaId])
@@ -177,6 +186,7 @@ model Configuracion {
   nombreNegocio          String          @default("Mi Negocio")
   moneda                 String          @default("ARS")
   ivaActivo              Boolean         @default(false)
+  ivaPorcentaje          Float           @default(21)
   porcentajeAlertaStock  Float           @default(10) // % general de stock mínimo
 
   // Licencia

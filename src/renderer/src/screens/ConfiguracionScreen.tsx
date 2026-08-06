@@ -13,6 +13,7 @@ const formSchema = z.object({
   nombreNegocio: z.string().min(1, 'Obligatorio'),
   moneda: z.string().min(1, 'Obligatorio'),
   ivaActivo: z.boolean(),
+  ivaPorcentaje: z.coerce.number().min(0, 'No puede ser negativo').default(21),
   porcentajeAlertaStock: z.coerce.number().min(0, 'No puede ser negativo')
 })
 
@@ -33,6 +34,7 @@ export function ConfiguracionScreen() {
       nombreNegocio: '',
       moneda: 'ARS',
       ivaActivo: false,
+      ivaPorcentaje: 21,
       porcentajeAlertaStock: 10
     }
   })
@@ -50,6 +52,7 @@ export function ConfiguracionScreen() {
           nombreNegocio: config.nombreNegocio,
           moneda: config.moneda,
           ivaActivo: config.ivaActivo,
+          ivaPorcentaje: config.ivaPorcentaje ?? 21,
           porcentajeAlertaStock: config.porcentajeAlertaStock
         })
         setLicencia({
@@ -107,9 +110,13 @@ export function ConfiguracionScreen() {
       
       const res = await (window as any).api.checkUpdates()
       
-      if (!res.success || res.status === 'error') {
+      if (!res.success || res.status === 'error' || res.status === 'rate_limit') {
         setUpdateStatus('error')
-        setUpdateMessage('No se pudo verificar. Revisá tu conexión a internet.')
+        if (res.status === 'rate_limit') {
+          setUpdateMessage('No se pudo verificar en este momento (límite temporal alcanzado). Probá de nuevo en un rato.')
+        } else {
+          setUpdateMessage('No se pudo verificar. Revisá tu conexión a internet.')
+        }
         return
       }
 
@@ -197,7 +204,7 @@ export function ConfiguracionScreen() {
                       <div className="space-y-0.5">
                         <FormLabel className="text-base">Control de IVA</FormLabel>
                         <FormDescription className="text-gray-500">
-                          Activar cálculos de impuestos (Próximamente).
+                          Aplicar recargo de IVA a las ventas automáticamente.
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -209,6 +216,25 @@ export function ConfiguracionScreen() {
                     </FormItem>
                   )}
                 />
+
+                {form.watch('ivaActivo') && (
+                  <FormField
+                    control={form.control as any}
+                    name="ivaPorcentaje"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Porcentaje de IVA (%)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.1" {...field} />
+                        </FormControl>
+                        <FormDescription className="text-xs text-gray-500">
+                          Se sumará este porcentaje al precio de todos los productos y recetas.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                   Guardar Configuración
@@ -222,7 +248,7 @@ export function ConfiguracionScreen() {
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
             <CardTitle>Licencia del Software</CardTitle>
-            <CardDescription className="text-gray-400">Estado de tu activación (Fase 9).</CardDescription>
+            <CardDescription className="text-gray-400">Información de tu licencia activa.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center py-2 border-b border-gray-800">
@@ -244,30 +270,54 @@ export function ConfiguracionScreen() {
               </span>
             </div>
             
-            <div className="pt-4 space-y-4">
-              <span className="font-medium text-sm text-gray-300">Activar o Renovar</span>
-              <div className="space-y-2">
-                <Input 
-                  placeholder="Tu Email" 
-                  value={licenciaEmail}
-                  onChange={(e) => setLicenciaEmail(e.target.value)}
-                />
-                <div className="flex gap-2">
+            {(licencia?.licenciaEstado === 'activa' || licencia?.licenciaEstado === 'gracia') ? (
+              <div className="pt-4">
+                <Button 
+                  variant="outline"
+                  onClick={async () => {
+                    setLicenciaLoading(true)
+                    try {
+                      await (window as any).api.verificarRenovacionSilenciosa()
+                      await loadData()
+                      alert('Verificación completada')
+                    } catch (e: any) {
+                      alert('Error: ' + e.message)
+                    } finally {
+                      setLicenciaLoading(false)
+                    }
+                  }}
+                  disabled={licenciaLoading}
+                  className="w-full border-gray-700 hover:bg-gray-800 text-gray-200"
+                >
+                  {licenciaLoading ? 'Verificando...' : 'Verificar estado ahora'}
+                </Button>
+              </div>
+            ) : (
+              <div className="pt-4 space-y-4">
+                <span className="font-medium text-sm text-gray-300">Activar o Renovar</span>
+                <div className="space-y-2">
                   <Input 
-                    placeholder="XXXX-XXXX-XXXX-XXXX" 
-                    value={licenciaCodigo}
-                    onChange={(e) => setLicenciaCodigo(e.target.value)}
+                    placeholder="Tu Email" 
+                    value={licenciaEmail}
+                    onChange={(e) => setLicenciaEmail(e.target.value)}
                   />
-                  <Button 
-                    onClick={handleActivarLicencia}
-                    disabled={licenciaLoading || !licenciaCodigo || !licenciaEmail} 
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {licenciaLoading ? 'Verificando...' : 'Verificar'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="XXXX-XXXX-XXXX-XXXX" 
+                      value={licenciaCodigo}
+                      onChange={(e) => setLicenciaCodigo(e.target.value)}
+                    />
+                    <Button 
+                      onClick={handleActivarLicencia}
+                      disabled={licenciaLoading || !licenciaCodigo || !licenciaEmail} 
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {licenciaLoading ? 'Verificando...' : 'Verificar'}
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
