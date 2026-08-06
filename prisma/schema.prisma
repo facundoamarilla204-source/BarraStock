@@ -1,0 +1,189 @@
+// ============================================
+// BarraStock — Schema Prisma (MVP / Fase 1)
+// Base de datos: SQLite (offline-first)
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------
+// ENUMS (Eliminados por limitación de SQLite)
+// Los siguientes campos ahora son String:
+// - UnidadMedida: "ml", "gr", "unidad"
+// - CategoriaReceta: "trago", "combo"
+// - MedioPago: "efectivo", "transferencia"
+// - EstadoVenta: "activa", "anulada"
+// - TipoItemVendido: "producto", "receta"
+// - EstadoLicencia: "activa", "vencida", "gracia", "bloqueada"
+
+// ------------------------------------------------
+// PRODUCTOS
+// Entidad unificada: un Producto es tanto un ítem vendible (botella, snack)
+// como un insumo de recetas (antes era "Ingrediente").
+// El stock siempre vive en la unidad base (ml, gr, o cantidad de unidades).
+// ------------------------------------------------
+model Producto {
+  id                String        @id @default(cuid())
+  nombre            String
+  stock             Float         @default(0)       // siempre en unidad base (ml, gr, o unidades)
+  precio            Float         @default(0)
+  costo             Float         @default(0)
+  categoria         String?
+  activo            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Campos de unificación (ex-Ingrediente)
+  unidadMedida      String        @default("unidad") // "ml" | "gr" | "unidad"
+  tamanioEnvase     Float?                            // solo si unidadMedida es ml o gr (ej: 1000 para botella de 1L)
+  vendiblePorUnidad Boolean       @default(true)      // si aparece en el POS como ítem directo
+
+  recetaItems       RecetaItem[]
+  detalleVentas     DetalleVenta[]
+
+  @@index([nombre])
+}
+
+// ------------------------------------------------
+// RECETAS
+// Representa tanto Tragos como Combos — mismo motor técnico.
+// La categoría define solo la agrupación visual en el POS.
+// ------------------------------------------------
+model Receta {
+  id            String           @id @default(cuid())
+  nombre        String
+  categoria     String
+  precio        Float
+  activa        Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  items         RecetaItem[]
+  detalleVentas DetalleVenta[]
+
+  @@index([nombre])
+}
+
+// ------------------------------------------------
+// RECETA_ITEM
+// Componentes de una receta: cada uno referencia UN Producto
+// con su cantidad y unidad.
+// ------------------------------------------------
+model RecetaItem {
+  id             String        @id @default(cuid())
+  recetaId       String
+  receta         Receta        @relation(fields: [recetaId], references: [id], onDelete: Cascade)
+
+  productoId     String
+  producto       Producto      @relation(fields: [productoId], references: [id])
+
+  cantidad       Float
+  unidad         String
+
+  @@index([recetaId])
+  @@index([productoId])
+}
+
+// ------------------------------------------------
+// CAJA_SESION
+// Turno o sesión de caja. Agrupa ventas.
+// ------------------------------------------------
+model CajaSesion {
+  id              String       @id @default(cuid())
+  numero          Int          @unique // correlativo legible
+
+  fondoInicial    Float        @default(0)
+  fechaApertura   DateTime     @default(now())
+
+  fechaCierre     DateTime?
+  totalEfectivo   Float?       // suma de ventas activas en efectivo
+  totalTransferencia Float?    // suma de ventas activas por transferencia
+  totalVentas     Float?       // totalEfectivo + totalTransferencia
+  totalEsperadoCaja Float?     // fondoInicial + totalEfectivo
+  cantidadVentas  Int?
+  cantidadAnuladas Int?
+
+  estado          String       @default("abierta") // "abierta" | "cerrada"
+
+  ventas          Venta[]
+}
+
+// ------------------------------------------------
+// VENTA
+// Cabecera de una venta. El total y estado permiten anulación.
+// ------------------------------------------------
+model Venta {
+  id          String         @id @default(cuid())
+  numero      Int?
+  cajaSesionId String?
+  cajaSesion  CajaSesion?    @relation(fields: [cajaSesionId], references: [id])
+  
+  fecha       DateTime       @default(now())
+  total       Float
+  medioPago   String
+  estado      String         @default("activa")
+  anuladaEn   DateTime?
+  motivoAnulacion String?
+  montoRecibido Float?
+  vuelto        Float?
+
+  detalles    DetalleVenta[]
+
+  @@index([fecha])
+  @@index([estado])
+}
+
+// ------------------------------------------------
+// DETALLE_VENTA
+// Cada línea de una venta. Referencia UN Producto O UNA Receta,
+// nunca ambos — el tipo indica cuál corresponde.
+// ------------------------------------------------
+model DetalleVenta {
+  id             String            @id @default(cuid())
+  ventaId        String
+  venta          Venta             @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  tipo           String
+
+  productoId     String?
+  producto       Producto?         @relation(fields: [productoId], references: [id])
+
+  recetaId       String?
+  receta         Receta?           @relation(fields: [recetaId], references: [id])
+
+  cantidad       Float
+  precioUnitario Float
+  subtotal       Float
+
+  @@index([ventaId])
+  @@index([productoId])
+  @@index([recetaId])
+}
+
+// ------------------------------------------------
+// CONFIGURACION
+// Singleton: una sola fila con la config del negocio.
+// Incluye datos de licencia (offline-first).
+// ------------------------------------------------
+model Configuracion {
+  id                     String          @id @default("config") // fuerza singleton
+  nombreNegocio          String          @default("Mi Negocio")
+  moneda                 String          @default("ARS")
+  ivaActivo              Boolean         @default(false)
+  porcentajeAlertaStock  Float           @default(10) // % general de stock mínimo
+
+  // Licencia
+  licenciaEmail          String?
+  licenciaCodigo         String?
+  licenciaVence          DateTime?
+  licenciaEstado         String          @default("bloqueada")
+  licenciaUltimoCheck    DateTime?
+
+  updatedAt              DateTime        @updatedAt
+}
