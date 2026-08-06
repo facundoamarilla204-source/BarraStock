@@ -19,15 +19,25 @@ extraResources:
     to: "node_modules/.prisma"
   - from: "prisma/template.db"
     to: "template.db"
+  - from: "prisma/schema.prisma"
+    to: "prisma/schema.prisma"
+  - from: "prisma/migrations"
+    to: "prisma/migrations"
 win:
   executableName: BarraStock
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
   oneClick: false
+  allowToChangeInstallationDirectory: true
   perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  license: LICENSE.txt
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

@@ -1,16 +1,14 @@
 import { prisma } from './db'
 
 export async function getConfiguracion() {
-  let config = await prisma.configuracion.findUnique({
-    where: { id: 'config' }
-  })
-
-  // Si no existe, la creamos (singleton lazy initialization)
-  if (!config) {
-    config = await prisma.configuracion.create({
-      data: { id: 'config' }
-    })
-  }
+  let config = await prisma.configuracion.upsert({
+    where: { id: 'config' },
+    update: {},
+    create: {
+      id: 'config',
+      licenciaActiva: false
+    }
+  });
 
   return config
 }

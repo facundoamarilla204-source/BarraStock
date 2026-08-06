@@ -1,0 +1,3 @@
+Este software es propiedad de PlayComun. Su uso está sujeto a los términos de la licencia adquirida.
+
+*Nota: Este es un texto de licencia temporal y genérico. Está pendiente de ser reemplazado por un documento legal más formal y detallado en futuras versiones.*
