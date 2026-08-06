@@ -71,7 +71,7 @@ export function DashboardScreen() {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
+      <h2 className="text-2xl font-bold tracking-tight">Dashboard <span className="text-sm font-normal text-gray-500 ml-2">v1.0.8</span></h2>
 
       {/* ESTADO DE CAJA */}
       <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">

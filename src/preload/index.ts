@@ -46,6 +46,8 @@ const api = {
 
   // App / Updater
   getVersion: () => ipcRenderer.invoke('app:version'),
+  checkUpdates: () => ipcRenderer.invoke('app:check-updates'),
+  relaunchAndUpdate: () => ipcRenderer.invoke('app:relaunch-update'),
   onUpdateReady: (callback: (version: string) => void) => {
     // Escuchar el evento una vez que se envíe desde main
     ipcRenderer.on('update-ready', (_event, data) => callback(data.version))

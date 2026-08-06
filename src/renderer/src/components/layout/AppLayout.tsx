@@ -75,10 +75,23 @@ export function AppLayout() {
           </div>
         )}
         {updateReady && (
-          <div className="bg-blue-600 border-b border-blue-700 text-white p-3 flex items-center justify-center gap-2 text-sm shrink-0 shadow-sm z-50">
-            <span>
-              Hay una actualización lista (<b>v{updateReady}</b>). Se instalará la próxima vez que reinicies BarraStock.
+          <div className="bg-blue-600 border-b border-blue-700 text-white p-3 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm shrink-0 shadow-sm z-50">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              <span>
+                Hay una actualización lista (<b>v{updateReady}</b>).
+              </span>
             </span>
+            <button
+              onClick={() => {
+                if (window.confirm('¿Seguro que querés reiniciar ahora? Cualquier venta en curso en el POS se perderá si no la cobraste.')) {
+                  ;(window as any).api.relaunchAndUpdate()
+                }
+              }}
+              className="bg-white text-blue-700 hover:bg-gray-100 font-semibold px-4 py-1.5 rounded-md transition-colors text-xs uppercase tracking-wider shadow-sm"
+            >
+              Reiniciar ahora
+            </button>
           </div>
         )}
         <div className="flex-1 overflow-y-auto p-6">

@@ -24,6 +24,9 @@ export function ConfiguracionScreen() {
   const [licenciaCodigo, setLicenciaCodigo] = useState('')
   const [licenciaEmail, setLicenciaEmail] = useState('')
 
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'loading' | 'up-to-date' | 'downloading' | 'error'>('idle')
+  const [updateMessage, setUpdateMessage] = useState('')
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
@@ -94,6 +97,31 @@ export function ConfiguracionScreen() {
       alert('Error: ' + error.message)
     } finally {
       setLicenciaLoading(false)
+    }
+  }
+
+  const handleCheckUpdates = async () => {
+    try {
+      setUpdateStatus('loading')
+      setUpdateMessage('Buscando actualizaciones...')
+      
+      const res = await (window as any).api.checkUpdates()
+      
+      if (!res.success || res.status === 'error') {
+        setUpdateStatus('error')
+        setUpdateMessage('No se pudo verificar. Revisá tu conexión a internet.')
+        return
+      }
+
+      setUpdateStatus(res.status)
+      if (res.status === 'up-to-date') {
+        setUpdateMessage(`Ya tenés la última versión (v${appVersion || res.version || 'actual'})`)
+      } else if (res.status === 'downloading') {
+        setUpdateMessage(`Hay una actualización disponible (v${res.version}). Descargando en segundo plano...`)
+      }
+    } catch (error) {
+      setUpdateStatus('error')
+      setUpdateMessage('Ocurrió un error al verificar actualizaciones.')
     }
   }
 
@@ -242,10 +270,36 @@ export function ConfiguracionScreen() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Sistema y Actualizaciones */}
+        <Card className="bg-gray-900 border-gray-800 md:col-span-2">
+          <CardHeader>
+            <CardTitle>Sistema</CardTitle>
+            <CardDescription className="text-gray-400">Actualizaciones y mantenimiento.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex-1">
+              <p className="text-sm text-gray-300 font-medium">Versión Actual: v{appVersion}</p>
+              {updateMessage && (
+                <p className={`text-sm mt-1 ${updateStatus === 'error' ? 'text-red-400' : updateStatus === 'up-to-date' ? 'text-green-400' : 'text-blue-400'}`}>
+                  {updateMessage}
+                </p>
+              )}
+            </div>
+            <Button 
+              onClick={handleCheckUpdates}
+              disabled={updateStatus === 'loading' || updateStatus === 'downloading'}
+              variant="outline"
+              className="border-gray-700 hover:bg-gray-800 text-gray-200"
+            >
+              {updateStatus === 'loading' ? 'Buscando...' : 'Buscar actualizaciones'}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="text-center text-sm text-gray-500 pt-4">
-        BarraStock {appVersion ? `v${appVersion}` : ''}
+      <div className="text-center text-sm text-gray-600 pt-4 pb-8">
+        BarraStock {appVersion ? `v${appVersion}` : ''} - Facundo Amarilla
       </div>
     </div>
   )

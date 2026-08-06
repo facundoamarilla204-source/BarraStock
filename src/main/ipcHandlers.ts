@@ -112,4 +112,14 @@ export function registerIpcHandlers() {
     const { app } = require('electron')
     return app.getVersion()
   })
+
+  const { checkUpdatesManual, relaunchAndUpdate } = require('./updaterService')
+  
+  ipcMain.handle('app:check-updates', async () => {
+    return await checkUpdatesManual()
+  })
+
+  ipcMain.handle('app:relaunch-update', () => {
+    relaunchAndUpdate()
+  })
 }
