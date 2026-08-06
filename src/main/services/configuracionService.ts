@@ -5,8 +5,7 @@ export async function getConfiguracion() {
     where: { id: 'config' },
     update: {},
     create: {
-      id: 'config',
-      licenciaActiva: false
+      id: 'config'
     }
   });
 
