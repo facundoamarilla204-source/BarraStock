@@ -47,8 +47,14 @@ export function DashboardScreen() {
 
       const bajas = [
         ...productos
-          .filter((p: any) => p.stock < threshold)
-          .map((p: any) => ({ ...p, tipo: 'Producto' }))
+          .map((p: any) => {
+            let maxStock = p.stock
+            if (p.tamanioEnvase && p.unidadMedida !== 'unidad') {
+              maxStock = Math.floor(p.stock / p.tamanioEnvase)
+            }
+            return { ...p, maxStock, tipo: 'Producto' }
+          })
+          .filter((p: any) => p.maxStock < threshold)
       ]
 
       // Sort by stock asc
@@ -100,15 +106,15 @@ export function DashboardScreen() {
             <div className="flex flex-wrap gap-6 mt-4 md:mt-0">
               <div>
                 <p className="text-sm text-gray-500">Fondo Inicial</p>
-                <p className="text-xl font-bold text-gray-200">${caja.fondoInicial.toFixed(2)}</p>
+                <p className="text-xl font-bold text-gray-200">${(caja.fondoInicial || 0).toFixed(2)}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Total Efectivo</p>
-                <p className="text-xl font-bold text-green-400">${caja.totalEfectivo.toFixed(2)}</p>
+                <p className="text-xl font-bold text-green-400">${(caja.totalEfectivo || 0).toFixed(2)}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Total Esperado</p>
-                <p className="text-xl font-bold text-blue-400">${caja.totalEsperadoCaja.toFixed(2)}</p>
+                <p className="text-xl font-bold text-blue-400">${(caja.totalEsperadoCaja || 0).toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -134,8 +140,8 @@ export function DashboardScreen() {
             <TrendingUp className="h-4 w-4 text-green-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalHoy.toFixed(2)}</div>
-            <p className="text-xs text-gray-500">Solo ventas activas</p>
+            <div className="text-2xl font-bold">${(totalHoy || 0).toFixed(2)}</div>
+            <p className="text-xs text-gray-500">Total cobrado hoy</p>
           </CardContent>
         </Card>
 
@@ -162,34 +168,77 @@ export function DashboardScreen() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* TOP 5 VENDIDOS */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* CAJA ESTADO */}
         <div>
           <h3 className="text-xl font-bold tracking-tight mb-4 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-blue-500" />
-            Top 5 Más Vendidos (Hoy)
+            <PackageOpen className="h-5 w-5 text-gray-400" />
+            Estado de Caja
           </h3>
-          <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-            {(!metrics?.topItems || metrics.topItems.length === 0) ? (
-              <div className="p-8 text-center text-gray-500">
-                <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>Todavía no hay ventas hoy.</p>
+          <Card className="bg-gray-900 border-gray-800 h-[300px]">
+            <CardContent className="p-6 flex flex-col justify-center h-full">
+              {caja ? (
+                <div className="text-center space-y-4">
+                  <Badge variant="secondary" className="bg-green-500/20 text-green-400 text-lg py-1 px-4">
+                    Abierta
+                  </Badge>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">Apertura</p>
+                    <p className="font-medium">{new Date(caja.fechaApertura).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-800 p-4 rounded-md border border-gray-700">
+                    <p className="text-sm text-gray-400 mb-1">Monto Inicial</p>
+                    <p className="text-2xl font-bold">${(caja.montoInicial || 0).toFixed(2)}</p>
+                  </div>
+                  <Link to="/caja">
+                    <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-colors">
+                      Gestionar Caja
+                    </button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <Badge variant="destructive" className="text-lg py-1 px-4 mb-4">
+                    Cerrada
+                  </Badge>
+                  <p className="text-gray-400 mb-6">No hay ninguna caja abierta actualmente.</p>
+                  <Link to="/caja">
+                    <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-colors">
+                      Abrir Caja
+                    </button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* TOP PRODUCTOS */}
+        <div>
+          <h3 className="text-xl font-bold tracking-tight mb-4 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-blue-400" />
+            Top 5 Más Vendidos
+          </h3>
+          <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden h-[300px]">
+            {!metrics?.topVendidos || metrics.topVendidos.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                No hay datos suficientes
               </div>
             ) : (
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-gray-800 bg-gray-900/50">
-                    <th className="px-4 py-3 font-medium text-gray-400">Producto/Receta</th>
-                    <th className="px-4 py-3 font-medium text-gray-400 text-right">Cantidad</th>
-                    <th className="px-4 py-3 font-medium text-gray-400 text-right">Facturado</th>
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-400 bg-gray-950/50">
+                  <tr>
+                    <th className="px-4 py-3">Ítem</th>
+                    <th className="px-4 py-3 text-right">Cant.</th>
+                    <th className="px-4 py-3 text-right">Recaudado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                  {metrics.topItems.map((item: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-gray-800/50">
+                  {metrics.topVendidos.map((item: any, i: number) => (
+                    <tr key={i} className="hover:bg-gray-800/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-200">{item.nombre}</td>
                       <td className="px-4 py-3 text-right text-gray-300">{item.cantidad}</td>
-                      <td className="px-4 py-3 text-right text-green-400 font-medium">${item.totalFacturado.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right text-green-400 font-medium">${(item.totalFacturado || 0).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -199,14 +248,14 @@ export function DashboardScreen() {
         </div>
 
         {/* ALERTAS INVENTARIO */}
-        <div>
+        <div className="md:col-span-2">
           <h3 className="text-xl font-bold tracking-tight mb-4 flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-red-500" />
             Alertas de Inventario
           </h3>
-          <div className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {alertasStock.length === 0 ? (
-              <div className="p-8 border border-dashed border-gray-800 rounded-lg text-center text-gray-500 bg-gray-900/50">
+              <div className="p-8 border border-dashed border-gray-800 rounded-lg text-center text-gray-500 bg-gray-900/50 col-span-full">
                 <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>Todo en orden, no hay stock bajo.</p>
               </div>
@@ -219,8 +268,10 @@ export function DashboardScreen() {
                       <div className="text-xs text-gray-400">{item.tipo}</div>
                     </div>
                     <div className="text-right">
-                      <Badge variant={item.stock === 0 ? 'destructive' : 'secondary'} className={item.stock === 0 ? '' : 'bg-orange-500/20 text-orange-400'}>
-                        Stock: {item.stock} {item.unidad || 'ud'}
+                      <Badge variant={item.maxStock <= 0 ? 'destructive' : 'secondary'} className={item.maxStock <= 0 ? '' : 'bg-orange-500/20 text-orange-400'}>
+                        {item.unidadMedida === 'unidad' 
+                          ? `Stock: ${item.maxStock} ud` 
+                          : `Stock: ${item.maxStock} un. (${item.stock} ${item.unidadMedida})`}
                       </Badge>
                     </div>
                   </CardContent>

@@ -8,6 +8,17 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 const formSchema = z.object({
   nombreNegocio: z.string().min(1, 'Obligatorio'),
@@ -27,6 +38,7 @@ export function ConfiguracionScreen() {
 
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'loading' | 'up-to-date' | 'downloading' | 'error'>('idle')
   const [updateMessage, setUpdateMessage] = useState('')
+  const [backupLoading, setBackupLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema) as any,
@@ -129,6 +141,38 @@ export function ConfiguracionScreen() {
     } catch (error) {
       setUpdateStatus('error')
       setUpdateMessage('Ocurrió un error al verificar actualizaciones.')
+    }
+  }
+
+  const handleBackup = async () => {
+    try {
+      setBackupLoading(true)
+      const res = await (window as any).api.backupDatabase()
+      if (res.success && res.path) {
+        alert(`Copia de seguridad guardada exitosamente en:\n${res.path}`)
+      } else if (!res.success && res.message !== 'Operación cancelada') {
+        alert('Error: ' + res.message)
+      }
+    } catch (e: any) {
+      alert('Error inesperado: ' + e.message)
+    } finally {
+      setBackupLoading(false)
+    }
+  }
+
+  const handleRestore = async () => {
+    try {
+      setBackupLoading(true)
+      const res = await (window as any).api.restoreDatabase()
+      if (res.success) {
+        alert('Copia restaurada exitosamente. La aplicación se cerrará/reiniciará ahora para aplicar los cambios.')
+      } else if (!res.success && res.message !== 'Operación cancelada') {
+        alert('Error: ' + res.message)
+      }
+    } catch (e: any) {
+      alert('Error inesperado: ' + e.message)
+    } finally {
+      setBackupLoading(false)
     }
   }
 
@@ -318,6 +362,65 @@ export function ConfiguracionScreen() {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Copia de Seguridad */}
+        <Card className="bg-gray-900 border-gray-800 md:col-span-2">
+          <CardHeader>
+            <CardTitle>Copia de Seguridad</CardTitle>
+            <CardDescription className="text-gray-400">
+              Respaldar o restaurar todos los datos (productos, ventas, configuración).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 border border-gray-800 rounded-lg p-4">
+              <h3 className="font-medium text-gray-200 mb-2">Hacer una copia de seguridad</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Se guardará un archivo con toda tu información en la carpeta que elijas. Recomendamos hacer esto periódicamente y guardarlo en un pendrive o en la nube.
+              </p>
+              <Button 
+                onClick={handleBackup} 
+                disabled={backupLoading}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {backupLoading ? 'Procesando...' : 'Hacer copia de seguridad'}
+              </Button>
+            </div>
+            
+            <div className="flex-1 border border-gray-800 rounded-lg p-4">
+              <h3 className="font-medium text-gray-200 mb-2">Restaurar copia de seguridad</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Permite cargar un archivo de backup previamente guardado. Utilizalo si tuviste un problema o cambiaste de computadora.
+              </p>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={backupLoading}>
+                    Restaurar copia de seguridad
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-gray-900 border-gray-800 text-gray-200">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-red-400">¿Estás completamente seguro?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-gray-400">
+                      Esto va a reemplazar TODOS los datos actuales de BarraStock por los de la copia seleccionada. Los datos actuales se perderán irremediablemente. Esta acción no se puede deshacer. ¿Confirmás que querés continuar?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="bg-gray-800 text-white hover:bg-gray-700 hover:text-white border-0">
+                      Cancelar
+                    </AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleRestore}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      Sí, restaurar datos
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </CardContent>
         </Card>
 

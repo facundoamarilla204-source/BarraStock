@@ -123,3 +123,71 @@ export async function verificarRenovacionSilenciosa() {
     console.log('Fallo el chequeo silencioso de licencia (posiblemente offline)', error)
   }
 }
+
+export async function solicitarRecuperacionLicencia(email: string) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error('Configuración de conexión no encontrada')
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/solicitar-recuperacion`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email })
+  })
+
+  const data = await response.json()
+  return data
+}
+
+export async function confirmarRecuperacionLicencia(email: string, codigo: string) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error('Configuración de conexión no encontrada')
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/confirmar-recuperacion`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, codigo })
+  })
+
+  const data = await response.json()
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || 'Código inválido o expirado')
+  }
+
+  // Si fue exitoso, guardamos igual que en la activación normal
+  // PERO mantenemos el codigo de activación original en null o generamos uno ficticio? 
+  // No, mantengamos el que ya tenemos si existe o vacío. La BD local requiere licenciaCodigo?
+  // La tabla configuracion tiene licenciaCodigo opcional u obligatorio?
+  
+  // Obtenemos config actual por si tiene licenciaCodigo (por las dudas)
+  const existingConfig = await prisma.configuracion.findUnique({ where: { id: 'config' } })
+  const codigoActivacionGuardar = existingConfig?.licenciaCodigo || 'recuperada'
+
+  const config = await prisma.configuracion.upsert({
+    where: { id: 'config' },
+    update: {
+      licenciaEmail: email,
+      licenciaVence: new Date(data.fecha_vencimiento),
+      licenciaEstado: 'activa',
+      licenciaUltimoCheck: new Date()
+    },
+    create: {
+      id: 'config',
+      licenciaCodigo: codigoActivacionGuardar,
+      licenciaEmail: email,
+      licenciaVence: new Date(data.fecha_vencimiento),
+      licenciaEstado: 'activa',
+      licenciaUltimoCheck: new Date()
+    }
+  })
+
+  return config
+}

@@ -38,7 +38,17 @@ Para publicar una nueva versión:
 Para asegurar que la aplicación siempre tenga permisos de lectura y escritura (evitando conflictos en `Program Files`), la base de datos se guarda en la carpeta de datos del usuario de Windows:
 - `%APPDATA%\BarraStock\database.db` (Usualmente `C:\Users\TU_USUARIO\AppData\Roaming\BarraStock\database.db`)
 
-Para hacer un **backup manual**, simplemente debes copiar ese archivo `.db`.
+### Flujo Completo: Cambiar de Computadora (Backup & Restauración)
+
+Si un cliente necesita migrar BarraStock a una nueva PC conservando todos sus datos (productos, caja, configuración), el flujo oficial documentado es el siguiente:
+
+1. **En la PC vieja:** Ir a `Configuración` → `Copia de Seguridad` → presionar **"Hacer copia de seguridad"** y guardarla en un pendrive o una carpeta sincronizada en la nube (ej. Google Drive).
+2. **En la PC nueva:** Instalar BarraStock normalmente (descargando el instalador).
+3. **Activar licencia en PC nueva:** Como el código de activación original puede figurar como usado (vinculado a la PC anterior), usar el flujo de **"Recuperar mi licencia"** en la pantalla inicial, recibiendo el código en el email.
+4. **Restaurar datos:** Una vez dentro del sistema (vacío), ir a `Configuración` → `Copia de Seguridad` → presionar **"Restaurar copia de seguridad"** y elegir el archivo `.db` guardado en el paso 1.
+5. **Listo:** La aplicación se reiniciará automáticamente y cargará todos los datos idénticos al momento del backup.
+
+> **Nota sobre Licencias y Backups:** El estado local de la licencia se guarda en la misma base de datos. Si se restaura un backup antiguo, es posible que la fecha de vencimiento local se restaure a un estado anterior. Sin embargo, el chequeo periódico silencioso (Fase 9) de la aplicación consultará automáticamente al servidor web en segundo plano y actualizará las fechas reales en caso de discrepancias, por lo que no se requiere acción manual.
 
 ## Firma de Código (Code Signing) - Windows
 

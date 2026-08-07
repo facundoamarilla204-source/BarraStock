@@ -1,3 +1,38 @@
-Este software es propiedad de PlayComun. Su uso está sujeto a los términos de la licencia adquirida.
+TÉRMINOS DE USO — BARRASTOCK
 
-*Nota: Este es un texto de licencia temporal y genérico. Está pendiente de ser reemplazado por un documento legal más formal y detallado en futuras versiones.*
+Este software, BarraStock, es desarrollado y distribuido por PlayComun.
+
+Al instalar y utilizar BarraStock, aceptás los siguientes términos:
+
+1. LICENCIA DE USO
+BarraStock se otorga bajo una licencia de uso por suscripción, no de venta. El derecho de uso está condicionado a mantener una licencia activa, adquirida a través de los canales oficiales de PlayComun. La suscripción es personal e intransferible, y su uso queda limitado al negocio para el cual fue adquirida.
+
+2. ALCANCE DE LA LICENCIA
+Esta licencia te permite instalar y utilizar BarraStock en los dispositivos que necesites para tu propio negocio, siempre que la licencia se encuentre activa. No incluye el derecho a redistribuir, revender, sublicenciar, ni realizar ingeniería inversa del software.
+
+3. DATOS DEL NEGOCIO
+Toda la información que cargues en BarraStock (productos, recetas, ventas, inventario, y cualquier otro dato de tu negocio) se almacena localmente en tu propia computadora. PlayComun no accede, almacena, ni tiene visibilidad de esos datos. Sos el único responsable de resguardar copias de seguridad de tu información.
+
+4. FUNCIONAMIENTO SIN CONEXIÓN
+BarraStock está diseñado para funcionar sin conexión a internet en su uso diario. La conexión a internet solo es necesaria para la activación inicial de la licencia y para validaciones periódicas de la suscripción.
+
+5. ACTUALIZACIONES
+PlayComun podrá publicar actualizaciones de BarraStock que se instalarán automáticamente cuando haya conexión a internet disponible, con el fin de corregir errores y sumar mejoras al software.
+
+6. LIMITACIÓN DE RESPONSABILIDAD
+BarraStock se entrega "tal cual", sin garantías de ningún tipo. PlayComun no se responsabiliza por pérdidas de datos, interrupciones del servicio, o cualquier perjuicio derivado directa o indirectamente del uso del software. Se recomienda realizar copias de seguridad periódicas de la información cargada.
+
+7. VIGENCIA Y RENOVACIÓN
+El acceso al software está sujeto al estado de la suscripción. Ante la falta de renovación, el acceso podrá suspenderse conforme a los términos comerciales vigentes al momento de la contratación.
+
+8. MODIFICACIONES A ESTOS TÉRMINOS
+PlayComun podrá actualizar estos términos en futuras versiones del software. El uso continuado de BarraStock luego de una actualización de estos términos implica la aceptación de los mismos.
+
+9. CONTACTO
+Para consultas sobre tu licencia o soporte técnico, contactate a través de los canales oficiales de PlayComun.
+
+---
+
+Al hacer clic en "Acepto", confirmás que leíste y aceptás estos términos de uso.
+
+© PlayComun. Todos los derechos reservados.

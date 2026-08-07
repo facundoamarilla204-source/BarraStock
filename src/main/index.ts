@@ -1,9 +1,14 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipcHandlers'
 import { setupAutoUpdater, checkForUpdatesSilently } from './updaterService'
+import { 
+  verificarEstadoLocal, 
+  solicitarRecuperacionLicencia,
+  confirmarRecuperacionLicencia 
+} from './services/licenciaService'
 import { runAutoMigrations } from './services/db'
 
 function createWindow(): BrowserWindow {
@@ -13,10 +18,32 @@ function createWindow(): BrowserWindow {
     height: 670,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    title: 'BarraStock',
+    icon: icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
+    }
+  })
+
+  ipcMain.handle('verificar-estado-licencia', async () => {
+    return await verificarEstadoLocal()
+  })
+
+  ipcMain.handle('solicitar-recuperacion-licencia', async (_, email) => {
+    try {
+      return await solicitarRecuperacionLicencia(email)
+    } catch (error: any) {
+      return { error: error.message }
+    }
+  })
+
+  ipcMain.handle('confirmar-recuperacion-licencia', async (_, email, codigo) => {
+    try {
+      await confirmarRecuperacionLicencia(email, codigo)
+      return { success: true }
+    } catch (error: any) {
+      return { error: error.message }
     }
   })
 
@@ -46,7 +73,7 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(async () => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.barrastock.app')
   
   try {
     await runAutoMigrations()

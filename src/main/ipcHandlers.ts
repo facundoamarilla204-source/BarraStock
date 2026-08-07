@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
 import * as productoService from './services/productoService'
 import * as recetaService from './services/recetaService'
 import * as configuracionService from './services/configuracionService'
@@ -7,6 +7,7 @@ import * as seedService from './services/seedService'
 import * as ventaService from './services/ventaService'
 import { cajaService } from './services/cajaService'
 import { checkUpdatesManual, relaunchAndUpdate } from './updaterService'
+import { backupService } from './services/backupService'
 
 export function registerIpcHandlers() {
   // Test Ping
@@ -120,5 +121,47 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('app:relaunch-update', () => {
     relaunchAndUpdate()
+  })
+
+  // Base de datos (Backup & Restore)
+  ipcMain.handle('database:backup', async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: 'Seleccionar carpeta para copia de seguridad',
+        properties: ['openDirectory']
+      })
+      
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, message: 'Operación cancelada' }
+      }
+      
+      const destination = result.filePaths[0]
+      const backupPath = await backupService.createBackup(destination)
+      return { success: true, path: backupPath }
+    } catch (e: any) {
+      console.error(e)
+      return { success: false, message: e.message }
+    }
+  })
+
+  ipcMain.handle('database:restore', async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: 'Seleccionar copia de seguridad',
+        filters: [{ name: 'Base de datos de SQLite', extensions: ['db'] }],
+        properties: ['openFile']
+      })
+      
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, message: 'Operación cancelada' }
+      }
+      
+      const source = result.filePaths[0]
+      await backupService.restoreBackup(source)
+      return { success: true }
+    } catch (e: any) {
+      console.error(e)
+      return { success: false, message: e.message }
+    }
   })
 }

@@ -5,7 +5,7 @@ import fs from 'fs'
 
 const isProd = app.isPackaged
 
-let dbPath: string
+export let dbPath: string
 let prismaUrl: string
 
 if (isProd) {

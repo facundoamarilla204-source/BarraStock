@@ -21,6 +21,8 @@ const api = {
   activarLicencia: (codigo: string, email: string) => ipcRenderer.invoke('licencia:activar', codigo, email),
   verificarEstadoLocal: () => ipcRenderer.invoke('licencia:verificar-local'),
   verificarRenovacionSilenciosa: () => ipcRenderer.invoke('licencia:renovacion-silenciosa'),
+  solicitarRecuperacionLicencia: (email: string) => ipcRenderer.invoke('solicitar-recuperacion-licencia', email),
+  confirmarRecuperacionLicencia: (email: string, codigo: string) => ipcRenderer.invoke('confirmar-recuperacion-licencia', email, codigo),
   
   // Ventas & Dashboard
   procesarVenta: (carrito: any[], medioPago?: string, montoRecibido?: number, vuelto?: number) => ipcRenderer.invoke('ventas:procesar', carrito, medioPago, montoRecibido, vuelto),
@@ -51,7 +53,11 @@ const api = {
   onUpdateReady: (callback: (version: string) => void) => {
     // Escuchar el evento una vez que se envíe desde main
     ipcRenderer.on('update-ready', (_event, data) => callback(data.version))
-  }
+  },
+
+  // Backup & Restore
+  backupDatabase: () => ipcRenderer.invoke('database:backup'),
+  restoreDatabase: () => ipcRenderer.invoke('database:restore')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

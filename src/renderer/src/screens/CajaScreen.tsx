@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { PackageOpen, XCircle, DollarSign, Activity } from 'lucide-react'
+import { PackageOpen, XCircle, Activity } from 'lucide-react'
 
 export function CajaScreen() {
   const [caja, setCaja] = useState<any>(null)
@@ -148,9 +148,11 @@ export function CajaScreen() {
                 Si cerraste la caja por error, puedes reabrir la última sesión cerrada.
               </p>
               <div className="bg-gray-950 p-4 rounded-md mb-4 text-sm text-gray-400 space-y-1">
-                <p><span className="font-medium text-gray-300">Caja #{ultimaCaja.numero}</span></p>
-                <p>Cierre: {new Date(ultimaCaja.fechaCierre).toLocaleString()}</p>
-                <p>Total Esperado en Caja: ${ultimaCaja.totalEsperadoCaja?.toFixed(2)}</p>
+                <div className="space-y-2 mt-4 text-gray-300">
+                <p>Total Efectivo Vendido: ${(ultimaCaja.totalEfectivo || 0).toFixed(2)}</p>
+                <p>Total Transferencia Vendido: ${(ultimaCaja.totalTransferencia || 0).toFixed(2)}</p>
+                <p>Total Esperado en Caja: ${(ultimaCaja.totalEsperadoCaja || 0).toFixed(2)}</p>
+              </div>
               </div>
               <button
                 onClick={handleReabrir}
@@ -183,27 +185,23 @@ export function CajaScreen() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-              <p className="text-sm font-medium text-gray-400 mb-1">Fondo Inicial</p>
-              <p className="text-2xl font-bold">${caja.fondoInicial.toFixed(2)}</p>
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <p className="text-gray-400 text-sm">Fondo Inicial</p>
+              <p className="text-2xl font-bold">${(caja.fondoInicial || 0).toFixed(2)}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-              <p className="text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-green-500" />
-                Ventas Efectivo
-              </p>
-              <p className="text-2xl font-bold text-green-400">${caja.totalEfectivo.toFixed(2)}</p>
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <p className="text-gray-400 text-sm">Efectivo Total Hoy</p>
+              <p className="text-2xl font-bold text-green-400">${(caja.totalEfectivo || 0).toFixed(2)}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-              <p className="text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-blue-500" />
-                Ventas Transferencia
-              </p>
-              <p className="text-2xl font-bold text-blue-400">${caja.totalTransferencia.toFixed(2)}</p>
+
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <p className="text-gray-400 text-sm">Transferencias Hoy</p>
+              <p className="text-2xl font-bold text-blue-400">${(caja.totalTransferencia || 0).toFixed(2)}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-              <p className="text-sm font-medium text-gray-400 mb-1">Total Ventas</p>
-              <p className="text-2xl font-bold">${caja.totalVentas.toFixed(2)}</p>
+
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <p className="text-gray-400 text-sm">Total Ventas</p>
+              <p className="text-2xl font-bold">${(caja.totalVentas || 0).toFixed(2)}</p>
             </div>
           </div>
 
@@ -216,10 +214,10 @@ export function CajaScreen() {
               <p className="text-sm font-medium text-gray-400 mb-1">Cantidad Anuladas</p>
               <p className="text-2xl font-bold">{caja.cantidadAnuladas}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 border-l-4 border-l-green-500">
-              <p className="text-sm font-medium text-gray-400 mb-1">Total Esperado en Caja (Efectivo)</p>
-              <p className="text-3xl font-bold text-green-400">${caja.totalEsperadoCaja.toFixed(2)}</p>
-              <p className="text-xs text-gray-500 mt-1">Fondo Inicial + Ventas Efectivo</p>
+            <div className="bg-gray-800 p-6 rounded-lg border border-green-900 shadow-[0_0_15px_rgba(74,222,128,0.1)] col-span-2 md:col-span-4 mt-2">
+              <p className="text-green-400/80 text-sm font-medium uppercase tracking-wider mb-1">TOTAL ESPERADO EN CAJA (Efectivo)</p>
+              <p className="text-3xl font-bold text-green-400">${(caja.totalEsperadoCaja || 0).toFixed(2)}</p>
+              <p className="text-xs text-gray-500 mt-2">Corresponde al fondo inicial + todo el efectivo ingresado por ventas hoy.</p>
             </div>
           </div>
         </div>
