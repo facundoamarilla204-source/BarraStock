@@ -30,13 +30,30 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     // Iniciar chequeo silencioso en background
     ;(window as any).api.verificarRenovacionSilenciosa()
 
-    // Obtener estado local inmediatamente
-    ;(window as any).api.verificarEstadoLocal().then((estadoLocal: string) => {
+    // Obtener estado local inmediatamente, con timeout de seguridad de 10s
+    const timeout = new Promise<string>((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout de seguridad (10s)')), 10000)
+    )
+
+    Promise.race([
+      (window as any).api.verificarEstadoLocal(),
+      timeout
+    ])
+    .then((estadoLocal: string) => {
       setEstado(estadoLocal)
     })
+    .catch((error) => {
+      console.error('Error o timeout al verificar estado local:', error)
+      // Si falla localmente por BD rota o cualquier otra cosa, lo mandamos a bloqueada/activar 
+      // para salir de la pantalla de carga infinita.
+      setEstado('bloqueada')
+    })
+
     // También obtenemos la config para saber si ya se activó antes
     ;(window as any).api.getConfiguracion().then((config: any) => {
       setTieneEmail(!!config?.licenciaEmail)
+    }).catch(() => {
+      setTieneEmail(false)
     })
   }, [])
 
