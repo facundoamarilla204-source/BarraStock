@@ -15,6 +15,18 @@ const api = {
   updateReceta: (id: string, data: any) => ipcRenderer.invoke('recetas:update', id, data),
   deleteReceta: (id: string) => ipcRenderer.invoke('recetas:delete', id),
 
+  // Proveedores
+  getProveedores: (filtros: any) => ipcRenderer.invoke('proveedores:get', filtros),
+  getProveedorById: (id: string) => ipcRenderer.invoke('proveedores:getById', id),
+  createProveedor: (data: any) => ipcRenderer.invoke('proveedores:create', data),
+  updateProveedor: (id: string, data: any) => ipcRenderer.invoke('proveedores:update', id, data),
+  toggleProveedorActivo: (id: string) => ipcRenderer.invoke('proveedores:toggleActivo', id),
+  getProveedoresMovimientos: (id: string) => ipcRenderer.invoke('proveedores:getMovimientos', id),
+  registrarPagoProveedor: (id: string, data: any) => ipcRenderer.invoke('proveedores:registrarPago', id, data),
+  getComprasByProveedor: (proveedorId: string) => ipcRenderer.invoke('proveedores:getCompras', proveedorId),
+  registrarCompra: (proveedorId: string, data: any) => ipcRenderer.invoke('proveedores:registrarCompra', proveedorId, data),
+  anularCompra: (compraId: string) => ipcRenderer.invoke('proveedores:anularCompra', compraId),
+
   // Configuración
   getConfiguracion: () => ipcRenderer.invoke('configuracion:get'),
   updateConfiguracion: (data: any) => ipcRenderer.invoke('configuracion:update', data),
@@ -25,7 +37,7 @@ const api = {
   confirmarRecuperacionLicencia: (email: string, codigo: string) => ipcRenderer.invoke('confirmar-recuperacion-licencia', email, codigo),
   
   // Ventas & Dashboard
-  procesarVenta: (carrito: any[], medioPago?: string, montoRecibido?: number, vuelto?: number) => ipcRenderer.invoke('ventas:procesar', carrito, medioPago, montoRecibido, vuelto),
+  procesarVenta: (carrito: any[], medioPago?: string, montoRecibido?: number, vuelto?: number, costoDelivery?: number) => ipcRenderer.invoke('ventas:procesar', carrito, medioPago, montoRecibido, vuelto, costoDelivery),
   anularVenta: (ventaId: string, motivo: string) => ipcRenderer.invoke('ventas:anular', { ventaId, motivo }),
   
   // Reportes

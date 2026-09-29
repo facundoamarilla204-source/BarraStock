@@ -24,13 +24,13 @@ const formSchema = z.object({
  */
 export function ActivacionScreen() {
   const location = useLocation()
-  const [modoManual, setModoManual] = useState<'activar' | 'recuperar' | null>(null)
+  const [modoManual, setModoManual] = useState<'activar' | 'recuperar' | 'bloqueada' | null>(null)
   const modoInicial = (location.state as any)?.modo || 'activar'
   
   const modoActual = modoManual || modoInicial
 
   if (modoActual === 'bloqueada') {
-    return <PantallaBloqueo />
+    return <PantallaBloqueo onActivarNueva={() => setModoManual('activar')} />
   }
 
   if (modoActual === 'recuperar') {
@@ -292,9 +292,21 @@ function PantallaRecuperacion({ onVolver }: { onVolver: () => void }) {
 
 // ─── Pantalla de BLOQUEO (licencia vencida + gracia agotada) ──
 
-function PantallaBloqueo() {
+function PantallaBloqueo({ onActivarNueva }: { onActivarNueva: () => void }) {
   const [checking, setChecking] = useState(false)
   const [mensaje, setMensaje] = useState<string | null>(null)
+  const [venceDate, setVenceDate] = useState<string | null>(null)
+
+  const navigate = useNavigate()
+
+  // Fetch fecha_vencimiento
+  useState(() => {
+    (window as any).api.getConfiguracion().then((config: any) => {
+      if (config?.licenciaVence) {
+        setVenceDate(new Date(config.licenciaVence).toLocaleDateString())
+      }
+    })
+  })
 
   async function reintentar() {
     setChecking(true)
@@ -305,10 +317,10 @@ function PantallaBloqueo() {
       const estado = await (window as any).api.verificarEstadoLocal()
 
       if (estado === 'activa' || estado === 'gracia') {
-        // Licencia renovada → recargar app
-        window.location.reload()
+        // Licencia renovada → redirigir a raíz para que AuthGuard tome el control
+        navigate('/', { replace: true })
       } else {
-        setMensaje('La licencia sigue sin renovar. Comprá o renová tu licencia en barrastock.com y volvé a intentar.')
+        setMensaje('La licencia sigue sin renovar. Comprá o renová tu licencia en https://barrastock-two.vercel.app/ y volvé a intentar.')
       }
     } catch (err: any) {
       setMensaje('No se pudo conectar al servidor. Verificá tu conexión a internet e intentá de nuevo.')
@@ -326,10 +338,13 @@ function PantallaBloqueo() {
           </div>
           <CardTitle className="text-2xl font-bold text-gray-100">Licencia vencida</CardTitle>
           <CardDescription className="text-gray-400 leading-relaxed">
-            Tu licencia de BarraStock venció y se agotó el período de gracia.
+            {venceDate ? `Tu licencia de BarraStock venció el ${venceDate} y se agotó el período de gracia.` : 'Tu licencia de BarraStock venció y se agotó el período de gracia.'}
+            <br />
             Para seguir usando el sistema, renová tu licencia en{' '}
-            <span className="text-blue-400 font-medium">barrastock.com</span>{' '}
-            y después presioná "Reintentar" con conexión a internet.
+            <a href="https://barrastock-two.vercel.app/" target="_blank" rel="noreferrer" className="text-blue-400 font-medium hover:underline">
+              barrastock-two.vercel.app
+            </a>
+            {' '}y después presioná "Reintentar chequeo".
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -352,10 +367,20 @@ function PantallaBloqueo() {
             ) : (
               <>
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Reintentar chequeo
+                Reintentar chequeo (mismo email)
               </>
             )}
           </Button>
+
+          <div className="pt-4 text-center">
+            <button
+              type="button"
+              onClick={onActivarNueva}
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors bg-transparent border-none cursor-pointer"
+            >
+              ¿Compraste una nueva licencia? Ingresá el código acá
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>

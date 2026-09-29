@@ -29,7 +29,7 @@ export async function activarLicencia(codigo: string, email: string) {
   }
 
   // 2. Guardar en base local
-  const config = await prisma.configuracion.upsert({
+  await prisma.configuracion.upsert({
     where: { id: 'config' },
     update: {
       licenciaCodigo: codigo,
@@ -48,7 +48,10 @@ export async function activarLicencia(codigo: string, email: string) {
     }
   })
 
-  return config
+  // 3. Reevaluar estado real en base a la fecha de vencimiento
+  await verificarEstadoLocal()
+
+  return await prisma.configuracion.findUnique({ where: { id: 'config' } })
 }
 
 export async function verificarEstadoLocal() {
@@ -62,7 +65,39 @@ export async function verificarEstadoLocal() {
   const ahora = new Date()
   const vence = new Date(config.licenciaVence)
 
-  // Calcular la diferencia en días
+  // ─── Detección de manipulación de reloj ───────────────────
+  // Si el último check guardado es posterior a "ahora" (con 5 min de tolerancia),
+  // significa que el reloj del sistema fue atrasado. No podemos confiar en la
+  // fecha local, así que forzamos estado 'gracia' hasta que un chequeo online
+  // (verificarRenovacionSilenciosa) resuelva la situación con fecha del servidor.
+  if (config.licenciaUltimoCheck) {
+    const ultimoCheck = new Date(config.licenciaUltimoCheck)
+    const CLOCK_TOLERANCE_MS = 5 * 60 * 1000 // 5 minutos
+
+    if (ultimoCheck.getTime() > ahora.getTime() + CLOCK_TOLERANCE_MS) {
+      console.warn(
+        '[Licencia] Anomalía de reloj detectada: licenciaUltimoCheck está en el futuro.',
+        `Último check: ${ultimoCheck.toISOString()}, Ahora: ${ahora.toISOString()}`
+      )
+
+      // Si ya estaba bloqueada, mantener bloqueada (no "desbloquear" por manipulación)
+      if (config.licenciaEstado === 'bloqueada') {
+        return 'bloqueada'
+      }
+
+      // Para cualquier otro estado, forzar gracia (app usable pero con aviso)
+      // hasta que el chequeo online confirme la situación real
+      if (config.licenciaEstado !== 'gracia') {
+        await prisma.configuracion.update({
+          where: { id: 'config' },
+          data: { licenciaEstado: 'gracia' }
+        })
+      }
+      return 'gracia'
+    }
+  }
+
+  // ─── Cálculo normal de estado ─────────────────────────────
   const diffTime = ahora.getTime() - vence.getTime()
   const diffDays = diffTime / (1000 * 3600 * 24)
 
@@ -90,7 +125,7 @@ export async function verificarRenovacionSilenciosa() {
       where: { id: 'config' }
     })
 
-    if (!config || !config.licenciaCodigo) return
+    if (!config || !config.licenciaEmail) return
 
     if (!SUPABASE_URL || !SUPABASE_KEY) return
 
@@ -116,11 +151,13 @@ export async function verificarRenovacionSilenciosa() {
         })
         
         // Reevaluar estado local después de la actualización
-        await verificarEstadoLocal()
+        return await verificarEstadoLocal()
       }
     }
+    return undefined
   } catch (error) {
     console.log('Fallo el chequeo silencioso de licencia (posiblemente offline)', error)
+    return undefined
   }
 }
 
@@ -171,9 +208,10 @@ export async function confirmarRecuperacionLicencia(email: string, codigo: strin
   const existingConfig = await prisma.configuracion.findUnique({ where: { id: 'config' } })
   const codigoActivacionGuardar = existingConfig?.licenciaCodigo || 'recuperada'
 
-  const config = await prisma.configuracion.upsert({
+  await prisma.configuracion.upsert({
     where: { id: 'config' },
     update: {
+      licenciaCodigo: codigoActivacionGuardar,
       licenciaEmail: email,
       licenciaVence: new Date(data.fecha_vencimiento),
       licenciaEstado: 'activa',
@@ -189,5 +227,8 @@ export async function confirmarRecuperacionLicencia(email: string, codigo: strin
     }
   })
 
-  return config
+  // Reevaluar estado real
+  await verificarEstadoLocal()
+  
+  return await prisma.configuracion.findUnique({ where: { id: 'config' } })
 }

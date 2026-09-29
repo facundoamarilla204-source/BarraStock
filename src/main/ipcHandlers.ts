@@ -8,7 +8,7 @@ import * as ventaService from './services/ventaService'
 import { cajaService } from './services/cajaService'
 import { checkUpdatesManual, relaunchAndUpdate } from './updaterService'
 import { backupService } from './services/backupService'
-
+import * as proveedorService from './services/proveedorService'
 export function registerIpcHandlers() {
   // Test Ping
   ipcMain.on('ping', () => console.log('pong'))
@@ -25,6 +25,18 @@ export function registerIpcHandlers() {
   ipcMain.handle('recetas:update', async (_, id, data) => await recetaService.updateReceta(id, data))
   ipcMain.handle('recetas:delete', async (_, id) => await recetaService.deleteReceta(id))
 
+  // Proveedores
+  ipcMain.handle('proveedores:get', async (_, filtros) => await proveedorService.getProveedores(filtros))
+  ipcMain.handle('proveedores:getById', async (_, id) => await proveedorService.getProveedorById(id))
+  ipcMain.handle('proveedores:create', async (_, data) => await proveedorService.createProveedor(data))
+  ipcMain.handle('proveedores:update', async (_, id, data) => await proveedorService.updateProveedor(id, data))
+  ipcMain.handle('proveedores:toggleActivo', async (_, id) => await proveedorService.toggleProveedorActivo(id))
+  ipcMain.handle('proveedores:getMovimientos', async (_, id) => await proveedorService.getProveedorMovimientos(id))
+  ipcMain.handle('proveedores:registrarPago', async (_, id, data) => await proveedorService.registrarPagoProveedor(id, data))
+
+  ipcMain.handle('proveedores:getCompras', async (_, proveedorId) => await proveedorService.getComprasByProveedor(proveedorId))
+  ipcMain.handle('proveedores:registrarCompra', async (_, proveedorId, data) => await proveedorService.registrarCompra(proveedorId, data))
+  ipcMain.handle('proveedores:anularCompra', async (_, compraId) => await proveedorService.anularCompra(compraId))
   // Reportes
   ipcMain.handle('reportes:get-avanzado', async (_, data) => await ventaService.getReporteAvanzado(new Date(data.desde), new Date(data.hasta)))
 
@@ -45,9 +57,9 @@ export function registerIpcHandlers() {
   
   // Ventas
   ipcMain.handle('ventas:get', async () => await ventaService.getVentas())
-  ipcMain.handle('ventas:procesar', async (_, carrito, medioPago, montoRecibido, vuelto) => {
+  ipcMain.handle('ventas:procesar', async (_, carrito, medioPago, montoRecibido, vuelto, costoDelivery) => {
     try {
-      return { success: true, data: await ventaService.procesarVenta(carrito, medioPago, montoRecibido, vuelto) }
+      return { success: true, data: await ventaService.procesarVenta(carrito, medioPago, montoRecibido, vuelto, costoDelivery) }
     } catch (e: any) {
       return { success: false, message: e.message }
     }

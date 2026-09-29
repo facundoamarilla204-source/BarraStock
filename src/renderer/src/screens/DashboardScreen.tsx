@@ -122,7 +122,7 @@ export function DashboardScreen() {
       </div>
 
       {/* METRICAS PRINCIPALES Y MEDIOS DE PAGO */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Ventas de Hoy</CardTitle>
@@ -164,6 +164,17 @@ export function DashboardScreen() {
           <CardContent>
             <div className="text-2xl font-bold">${(metrics?.totalTransferencia || 0).toFixed(2)}</div>
             <p className="text-xs text-gray-500">Ventas por transferencia</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">Ganancia Bruta Hoy</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${(metrics?.totalGananciaBruta || 0).toFixed(2)}</div>
+            <p className="text-xs text-gray-500">Ventas menos costo</p>
           </CardContent>
         </Card>
       </div>

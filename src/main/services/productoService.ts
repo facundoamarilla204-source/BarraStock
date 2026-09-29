@@ -9,6 +9,7 @@ export async function getProductos() {
 
 export async function createProducto(data: {
   nombre: string
+  codigoBarras?: string
   precio?: number
   stock?: number
   costo?: number
@@ -18,6 +19,16 @@ export async function createProducto(data: {
   vendiblePorUnidad?: boolean
   cantidadEnvases?: number
 }) {
+  // Check unique barcode
+  if (data.codigoBarras) {
+    const existing = await prisma.producto.findUnique({
+      where: { codigoBarras: data.codigoBarras }
+    })
+    if (existing && existing.activo) {
+      throw new Error('Ya existe un producto con este código de barras')
+    }
+  }
+
   // Calcular stock real según unidad de medida
   let stockReal = data.stock ?? 0
 
@@ -31,6 +42,7 @@ export async function createProducto(data: {
   return await prisma.producto.create({
     data: {
       nombre: data.nombre,
+      codigoBarras: data.codigoBarras || null,
       precio: data.precio ?? 0,
       stock: stockReal,
       costo: data.costo ?? 0,
@@ -46,6 +58,7 @@ export async function updateProducto(
   id: string,
   data: {
     nombre?: string
+    codigoBarras?: string
     precio?: number
     stock?: number
     costo?: number
@@ -57,9 +70,24 @@ export async function updateProducto(
     cantidadEnvases?: number
   }
 ) {
+  // Check unique barcode
+  if (data.codigoBarras) {
+    const existing = await prisma.producto.findUnique({
+      where: { codigoBarras: data.codigoBarras }
+    })
+    if (existing && existing.id !== id && existing.activo) {
+      throw new Error('Ya existe un producto con este código de barras')
+    }
+  }
+
   // Si envían cantidadEnvases + tamanioEnvase, recalcular stock
   const updateData: any = { ...data }
   delete updateData.cantidadEnvases
+  
+  // Convert empty string to null for codigoBarras if needed, but since it's optional string, we can just use it
+  if (updateData.codigoBarras === "") {
+    updateData.codigoBarras = null
+  }
 
   if (data.cantidadEnvases != null && data.tamanioEnvase != null) {
     updateData.stock = data.cantidadEnvases * data.tamanioEnvase

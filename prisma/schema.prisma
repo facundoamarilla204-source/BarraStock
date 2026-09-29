@@ -32,6 +32,7 @@ datasource db {
 model Producto {
   id                String        @id @default(cuid())
   nombre            String
+  codigoBarras      String?       @unique
   stock             Float         @default(0)       // siempre en unidad base (ml, gr, o unidades)
   precio            Float         @default(0)
   costo             Float         @default(0)
@@ -47,6 +48,8 @@ model Producto {
 
   recetaItems       RecetaItem[]
   detalleVentas     DetalleVenta[]
+  proveedores       ProductoProveedor[]
+  detallesCompra    DetalleCompra[]
 
   @@index([nombre])
 }
@@ -139,6 +142,13 @@ model Venta {
   iva           Float?
   ivaPorcentaje Float?
 
+  // Delivery
+  costoDelivery Float?         @default(0)
+  pagoDelivery  Float?         @default(0)
+
+  // Rentabilidad
+  gananciaBruta Float?
+
   detalles    DetalleVenta[]
 
   @@index([fecha])
@@ -171,6 +181,10 @@ model DetalleVenta {
   neto           Float?
   iva            Float?
 
+  // Rentabilidad
+  costoUnitario  Float?
+  ganancia       Float?
+
   @@index([ventaId])
   @@index([productoId])
   @@index([recetaId])
@@ -188,6 +202,7 @@ model Configuracion {
   ivaActivo              Boolean         @default(false)
   ivaPorcentaje          Float           @default(21)
   porcentajeAlertaStock  Float           @default(10) // % general de stock mínimo
+  porcentajeDelivery     Float           @default(100) // % del costo de envío que va al repartidor
 
   // Licencia
   licenciaEmail          String?
@@ -197,4 +212,111 @@ model Configuracion {
   licenciaUltimoCheck    DateTime?
 
   updatedAt              DateTime        @updatedAt
+}
+
+// ------------------------------------------------
+// PROVEEDORES Y COMPRAS
+// ------------------------------------------------
+model Proveedor {
+  id              String   @id @default(cuid())
+  razonSocial     String
+  cuit            String?
+  contacto        String?
+  telefono        String?
+  whatsapp        String?
+  email           String?
+  direccion       String?
+  localidad       String?
+  tipo            String?  // Bebidas, Alimentos, Insumos, etc.
+  condicionPago   String?  // Contado, Cuenta Corriente
+  diasVencimiento Int?     @default(0)
+  limiteCredito   Float?   @default(0)
+  notas           String?
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  compras         Compra[]
+  pagos           PagoProveedor[]
+  movimientos     ProveedorMovimiento[]
+  productos       ProductoProveedor[]
+}
+
+model Compra {
+  id               String   @id @default(cuid())
+  proveedorId      String
+  proveedor        Proveedor @relation(fields: [proveedorId], references: [id])
+  fecha            DateTime @default(now())
+  numero           String?
+  total            Float    @default(0)
+  importePagado    Float    @default(0)
+  saldoPendiente   Float    @default(0)
+  estado           String   @default("pendiente") // pendiente, parcial, pagada, anulada
+  fechaVencimiento DateTime?
+  observaciones    String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  movimientos      ProveedorMovimiento[]
+  detalles         DetalleCompra[]
+}
+
+model DetalleCompra {
+  id             String   @id @default(cuid())
+  compraId       String
+  compra         Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  productoId     String
+  producto       Producto @relation(fields: [productoId], references: [id])
+  
+  cantidad       Float
+  costoUnitario  Float
+  subtotal       Float
+}
+
+model PagoProveedor {
+  id            String   @id @default(cuid())
+  proveedorId   String
+  proveedor     Proveedor @relation(fields: [proveedorId], references: [id])
+  fecha         DateTime @default(now())
+  importe       Float
+  medioPago     String
+  referencia    String?
+  observaciones String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  movimientos   ProveedorMovimiento[]
+}
+
+model ProveedorMovimiento {
+  id              String   @id @default(cuid())
+  proveedorId     String
+  proveedor       Proveedor @relation(fields: [proveedorId], references: [id])
+  
+  compraId        String?
+  compra          Compra?   @relation(fields: [compraId], references: [id])
+  
+  pagoId          String?
+  pago            PagoProveedor? @relation(fields: [pagoId], references: [id])
+
+  fecha           DateTime @default(now())
+  tipo            String   // 'COMPRA' (débito), 'PAGO' (crédito), 'AJUSTE'
+  descripcion     String
+  monto           Float    // Positivo incrementa deuda (compra), negativo reduce deuda (pago)
+  saldoResultante Float
+}
+
+model ProductoProveedor {
+  id              String   @id @default(cuid())
+  proveedorId     String
+  proveedor       Proveedor @relation(fields: [proveedorId], references: [id])
+  productoId      String
+  producto        Producto  @relation(fields: [productoId], references: [id])
+  
+  ultimoCosto     Float?
+  fechaUltimaCompra DateTime?
+  esPrincipal     Boolean   @default(false)
+
+  @@unique([proveedorId, productoId])
 }

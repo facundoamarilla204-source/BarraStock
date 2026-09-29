@@ -17,6 +17,7 @@ export async function updateConfiguracion(data: {
   moneda?: string;
   ivaActivo?: boolean;
   porcentajeAlertaStock?: number;
+  porcentajeDelivery?: number;
 }) {
   return await prisma.configuracion.update({
     where: { id: 'config' },

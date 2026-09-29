@@ -1,8 +1,9 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
 import { AppLayout } from './components/layout/AppLayout'
 import { DashboardScreen } from './screens/DashboardScreen'
 import { ProductosScreen } from './screens/ProductosScreen'
+import { ProveedoresScreen } from './screens/ProveedoresScreen'
 import { RecetasScreen } from './screens/RecetasScreen'
 import { POSScreen } from './screens/POSScreen'
 import { VentasScreen } from './screens/VentasScreen'
@@ -11,6 +12,15 @@ import { ActivacionScreen } from './screens/ActivacionScreen'
 import { CajaScreen } from './screens/CajaScreen'
 import { HistorialCajasScreen } from './screens/HistorialCajasScreen'
 import { ReportesScreen } from './screens/ReportesScreen'
+import { DeliveryScreen } from './screens/DeliveryScreen'
+
+/**
+ * Context de licencia — permite que AppLayout lea el estado verificado
+ * directamente del AuthGuard sin hacer un getConfiguracion() separado
+ * que podría leerse antes de que el backend actualice la BD.
+ */
+const LicenciaContext = createContext<string>('activa')
+export const useLicenciaEstado = () => useContext(LicenciaContext)
 
 /**
  * AuthGuard — protege las rutas de la app según el estado de la licencia.
@@ -27,9 +37,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const [tieneEmail, setTieneEmail] = useState(false)
 
   useEffect(() => {
-    // Iniciar chequeo silencioso en background
-    ;(window as any).api.verificarRenovacionSilenciosa()
-
     // Obtener estado local inmediatamente, con timeout de seguridad de 10s
     const timeout = new Promise<string>((_, reject) => 
       setTimeout(() => reject(new Error('Timeout de seguridad (10s)')), 10000)
@@ -41,6 +48,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     ])
     .then((estadoLocal: string) => {
       setEstado(estadoLocal)
+      
+      // Iniciar chequeo silencioso en background DESPUÉS de resolver el estado local
+      // para evitar race conditions en Prisma o estados incorrectos en UI.
+      ;(window as any).api.verificarRenovacionSilenciosa().then((nuevoEstado: string | undefined) => {
+        if (nuevoEstado && nuevoEstado !== estadoLocal) {
+          setEstado(nuevoEstado)
+        }
+      })
     })
     .catch((error) => {
       console.error('Error o timeout al verificar estado local:', error)
@@ -55,6 +70,18 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }).catch(() => {
       setTieneEmail(false)
     })
+
+    // Chequeo periódico cada 1 hora (3600000 ms) para asegurar que
+    // el estado se actualiza si la app queda abierta 24/7
+    const intervalId = setInterval(() => {
+      ;(window as any).api.verificarRenovacionSilenciosa().then((nuevoEstado: string | undefined) => {
+        if (nuevoEstado) {
+          setEstado(nuevoEstado)
+        }
+      })
+    }, 3600000)
+
+    return () => clearInterval(intervalId)
   }, [])
 
   if (estado === null) {
@@ -70,7 +97,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/activar" replace state={{ modo }} />
   }
 
-  return <>{children}</>
+  return (
+    <LicenciaContext.Provider value={estado}>
+      {children}
+    </LicenciaContext.Provider>
+  )
 }
 
 function App() {
@@ -88,8 +119,10 @@ function App() {
           <Route path="caja" element={<CajaScreen />} />
           <Route path="pos" element={<POSScreen />} />
           <Route path="productos" element={<ProductosScreen />} />
+          <Route path="proveedores" element={<ProveedoresScreen />} />
           <Route path="recetas" element={<RecetasScreen />} />
           <Route path="ventas" element={<VentasScreen />} />
+          <Route path="delivery" element={<DeliveryScreen />} />
           <Route path="historial-cajas" element={<HistorialCajasScreen />} />
           <Route path="reportes" element={<ReportesScreen />} />
           <Route path="configuracion" element={<ConfiguracionScreen />} />

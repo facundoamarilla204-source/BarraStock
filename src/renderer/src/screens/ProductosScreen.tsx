@@ -30,6 +30,7 @@ export function ProductosScreen() {
   const [formData, setFormData] = useState({
     id: '',
     nombre: '',
+    codigoBarras: '',
     precio: 0,
     costo: 0,
     categoria: '',
@@ -61,6 +62,7 @@ export function ProductosScreen() {
     e.preventDefault()
     const payload: any = {
       nombre: formData.nombre,
+      codigoBarras: formData.codigoBarras,
       precio: formData.precio,
       costo: formData.costo,
       categoria: formData.categoria || undefined,
@@ -92,6 +94,7 @@ export function ProductosScreen() {
     setFormData({
       id: item.id,
       nombre: item.nombre,
+      codigoBarras: item.codigoBarras || '',
       precio: item.precio,
       costo: item.costo,
       categoria: item.categoria || '',
@@ -114,6 +117,7 @@ export function ProductosScreen() {
     setFormData({
       id: '',
       nombre: '',
+      codigoBarras: '',
       precio: 0,
       costo: 0,
       categoria: '',
@@ -146,8 +150,8 @@ export function ProductosScreen() {
         className="max-w-sm"
       />
 
-      <div className="border rounded-md max-h-[60vh] overflow-y-auto">
-        <Table>
+      <div className="border rounded-md max-h-[60vh] overflow-y-auto overflow-x-auto">
+        <Table className="min-w-[800px]">
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
@@ -155,6 +159,8 @@ export function ProductosScreen() {
               <TableHead>Unidad</TableHead>
               <TableHead>Stock</TableHead>
               <TableHead>Precio</TableHead>
+              <TableHead>Costo</TableHead>
+              <TableHead>Rentabilidad</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -172,6 +178,19 @@ export function ProductosScreen() {
                 <TableCell>{formatStock(item)}</TableCell>
                 <TableCell>
                   {item.precio > 0 ? `$${item.precio.toFixed(2)}` : '-'}
+                </TableCell>
+                <TableCell>
+                  {item.costo > 0 ? `$${item.costo.toFixed(2)}` : <span className="text-gray-500 text-xs">No inf.</span>}
+                </TableCell>
+                <TableCell>
+                  {item.costo > 0 && item.precio > 0 ? (
+                    <div className="flex flex-col">
+                      <span className="text-green-400 font-medium">+${(item.precio - item.costo).toFixed(2)}</span>
+                      <span className="text-xs text-gray-400">{(((item.precio - item.costo) / item.precio) * 100).toFixed(1)}% margen</span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-500 text-xs">-</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   {item.vendiblePorUnidad ? (
@@ -215,16 +234,26 @@ export function ProductosScreen() {
             <DialogTitle>{formData.id ? 'Editar' : 'Nuevo'} Producto</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre</Label>
-              <Input
-                required
-                value={formData.nombre}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nombre</Label>
+                <Input
+                  required
+                  value={formData.nombre}
+                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Código de Barras (opcional)</Label>
+                <Input
+                  value={formData.codigoBarras}
+                  onChange={(e) => setFormData({ ...formData, codigoBarras: e.target.value })}
+                  placeholder="Escanee o ingrese código"
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Precio de Venta</Label>
                 <Input
@@ -251,10 +280,25 @@ export function ProductosScreen() {
                     setFormData({ ...formData, costo: parseFloat(e.target.value) || 0 })
                   }
                 />
+                {formData.costo > 0 && formData.precio > 0 && (
+                  <div className="flex gap-4 mt-2 p-2 bg-gray-900/50 rounded-md text-sm border border-gray-800">
+                    <div>
+                      <span className="text-gray-400 block text-xs">Ganancia/u</span>
+                      <span className="text-green-400 font-medium">+${(formData.precio - formData.costo).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-xs">Margen bruto</span>
+                      <span className="text-gray-200">{(((formData.precio - formData.costo) / formData.precio) * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                )}
+                {(!formData.costo || formData.costo <= 0) && (
+                  <p className="text-xs text-gray-500 mt-1">Costo no informado. No se calculará rentabilidad.</p>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Unidad de Medida</Label>
                 <select
@@ -285,7 +329,7 @@ export function ProductosScreen() {
 
             {isLiquido ? (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Tamaño del envase ({formData.unidadMedida})</Label>
                     <Input

@@ -5,6 +5,7 @@ export interface CartItem {
   nombre: string
   tipo: 'producto' | 'receta'
   precio: number
+  costo?: number
   cantidad: number
 }
 

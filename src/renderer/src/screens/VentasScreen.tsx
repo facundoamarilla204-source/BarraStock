@@ -38,8 +38,8 @@ export function VentasScreen() {
         <h2 className="text-2xl font-bold">Ventas del Día</h2>
       </div>
 
-      <div className="border rounded-md">
-        <Table>
+      <div className="border rounded-md overflow-x-auto">
+        <Table className="min-w-[700px]">
           <TableHeader>
             <TableRow>
               <TableHead>Hora</TableHead>
@@ -140,8 +140,8 @@ export function VentasScreen() {
                 )}
               </div>
 
-              <div className="border rounded-md mt-4">
-                <Table>
+              <div className="border rounded-md mt-4 overflow-x-auto">
+                <Table className="min-w-[400px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Ítem</TableHead>

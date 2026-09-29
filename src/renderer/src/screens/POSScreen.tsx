@@ -1,28 +1,50 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useCartStore } from '../store/useCartStore'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
+import { LayoutGrid, Maximize, Minimize } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export function POSScreen() {
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  
+  useEffect(() => {
+    searchInputRef.current?.focus()
+  }, [])
+
   const [items, setItems] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [categoria, setCategoria] = useState<string | null>(null)
   const [montoRecibido, setMontoRecibido] = useState<string>('')
+  const [costoDelivery, setCostoDelivery] = useState<string>('')
+  const [showDeliveryInput, setShowDeliveryInput] = useState(false)
   const [ivaInfo, setIvaInfo] = useState({ activo: false, porcentaje: 21 })
+  const [scanMessage, setScanMessage] = useState<{text: string, type: 'error'|'success'} | null>(null)
+  
+  const [cardSize, setCardSize] = useState<'chico' | 'mediano' | 'grande'>(() => {
+    return (localStorage.getItem('pos_card_size') as any) || 'mediano'
+  })
+
+  const cardSizeMap = {
+    chico: '130px',
+    mediano: '180px',
+    grande: '240px'
+  }
   
   const cart = useCartStore()
   
-  // Sincronizar monto recibido con el total cuando cambia el carrito o el método de pago
+  const totalGeneral = cart.getTotal() + (parseFloat(costoDelivery) || 0)
+
+  // Sincronizar monto recibido con el total cuando cambia el método de pago
   useEffect(() => {
     if (cart.metodoPago === 'efectivo') {
-      const total = cart.getTotal()
-      if (montoRecibido === '' || parseFloat(montoRecibido) < total) {
-        setMontoRecibido(total.toString())
+      if (montoRecibido === '') {
+        setMontoRecibido(totalGeneral.toString())
       }
     }
-  }, [cart.items, cart.metodoPago])
+  }, [cart.metodoPago])
 
   const loadData = async () => {
     const config = await (window as any).api.getConfiguracion()
@@ -71,7 +93,8 @@ export function POSScreen() {
   }, [])
 
   const filtered = items.filter(i => {
-    const matchSearch = i.nombre.toLowerCase().includes(search.toLowerCase())
+    const matchSearch = i.nombre.toLowerCase().includes(search.toLowerCase()) || 
+                        (i.codigoBarras && i.codigoBarras.includes(search.toLowerCase()))
     const matchCat = categoria ? i.categoria?.toLowerCase() === categoria.toLowerCase() : true
     return matchSearch && matchCat
   })
@@ -80,17 +103,17 @@ export function POSScreen() {
   const categorias = Array.from(new Set(items.map(i => i.categoria).filter(Boolean)))
 
   const handleCobrar = async () => {
-    if (cart.items.length === 0) return
-    const total = cart.getTotal()
+    const deliveryNum = parseFloat(costoDelivery) || 0
+    if (cart.items.length === 0 && deliveryNum === 0) return
     const isEfectivo = cart.metodoPago === 'efectivo'
     const montoNum = parseFloat(montoRecibido)
     
-    if (isEfectivo && (isNaN(montoNum) || montoNum < total)) {
+    if (isEfectivo && (isNaN(montoNum) || montoNum < totalGeneral)) {
       alert('El monto recibido es menor al total')
       return
     }
 
-    const vueltoNum = isEfectivo ? montoNum - total : undefined
+    const vueltoNum = isEfectivo ? montoNum - totalGeneral : undefined
     const finalMontoRecibido = isEfectivo ? montoNum : undefined
 
     try {
@@ -98,13 +121,16 @@ export function POSScreen() {
         id: i.id,
         tipo: i.tipo,
         cantidad: i.cantidad,
-        precioUnitario: i.precio
+        precioUnitario: i.precio,
+        costoUnitario: i.costo
       }))
-      const res = await (window as any).api.procesarVenta(payload, cart.metodoPago, finalMontoRecibido, vueltoNum)
+      const res = await (window as any).api.procesarVenta(payload, cart.metodoPago, finalMontoRecibido, vueltoNum, deliveryNum)
       if (res.success) {
         alert('Venta procesada con éxito')
         cart.clearCart()
         setMontoRecibido('')
+        setCostoDelivery('')
+        setShowDeliveryInput(false)
         loadData() // Recargar para actualizar stocks
       } else {
         alert('Error: ' + (res.message || res.error))
@@ -114,38 +140,90 @@ export function POSScreen() {
     }
   }
 
+  const handleSizeChange = (size: 'chico' | 'mediano' | 'grande') => {
+    setCardSize(size)
+    localStorage.setItem('pos_card_size', size)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const barcode = search.trim()
+      if (!barcode) return
+      
+      const match = items.find(i => i.codigoBarras === barcode)
+      
+      if (match) {
+        if (match.maxStock <= 0) {
+          setScanMessage({ text: `Agotado: ${match.nombre}`, type: 'error' })
+        } else {
+          cart.addItem({ id: match.id, nombre: match.nombre, tipo: match.tipo, precio: match.precio, costo: match.costo })
+          setScanMessage({ text: `Agregado: ${match.nombre}`, type: 'success' })
+        }
+        setSearch('')
+      } else {
+        setScanMessage({ text: `Código no encontrado: ${barcode}`, type: 'error' })
+        setSearch('')
+      }
+      
+      setTimeout(() => setScanMessage(null), 3000)
+    }
+  }
+
   return (
-    <div className="flex h-full gap-6">
+    <div className="flex flex-col md:flex-row h-full gap-4 md:gap-6 overflow-hidden">
       {/* Catálogo (Izquierda) */}
-      <div className="flex-1 flex flex-col gap-4">
-        <Input 
-          placeholder="Buscar producto o receta (autofocus)..." 
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          autoFocus
-          className="h-12 text-lg"
-        />
+      <div className="flex-1 flex flex-col gap-4 min-w-0 overflow-hidden">
+        <div className="flex flex-col gap-1">
+          <Input 
+            ref={searchInputRef}
+            placeholder="Escanear o buscar producto..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="h-12 text-lg shrink-0"
+          />
+          {scanMessage && (
+            <div className={`text-sm px-2 py-1 rounded-md ${scanMessage.type === 'error' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+              {scanMessage.text}
+            </div>
+          )}
+        </div>
         
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          <Button 
-            variant={categoria === null ? 'default' : 'outline'} 
-            onClick={() => setCategoria(null)}
-          >
-            Todos
-          </Button>
-          {categorias.map(cat => (
+        <div className="flex gap-2 overflow-x-auto pb-2 shrink-0 items-center justify-between">
+          <div className="flex gap-2">
             <Button 
-              key={cat as string} 
-              variant={categoria === cat ? 'default' : 'outline'}
-              onClick={() => setCategoria(cat as string)}
+              variant={categoria === null ? 'default' : 'outline'} 
+              onClick={() => setCategoria(null)}
+              className="whitespace-nowrap"
             >
-              {cat as string}
+              Todos
             </Button>
-          ))}
+            {categorias.map(cat => (
+              <Button 
+                key={cat as string} 
+                variant={categoria === cat ? 'default' : 'outline'}
+                onClick={() => setCategoria(cat as string)}
+                className="whitespace-nowrap"
+              >
+                {cat as string}
+              </Button>
+            ))}
+          </div>
+          <div className="flex gap-1 bg-gray-800 p-1 rounded-lg shrink-0">
+             <Button variant={cardSize === 'chico' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleSizeChange('chico')} title="Pequeño" className="px-2 h-8">
+               <Minimize className="w-4 h-4" />
+             </Button>
+             <Button variant={cardSize === 'mediano' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleSizeChange('mediano')} title="Mediano" className="px-2 h-8">
+               <LayoutGrid className="w-4 h-4" />
+             </Button>
+             <Button variant={cardSize === 'grande' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleSizeChange('grande')} title="Grande" className="px-2 h-8">
+               <Maximize className="w-4 h-4" />
+             </Button>
+          </div>
         </div>
 
         <ScrollArea className="flex-1 border rounded-md p-4 bg-gray-900/50">
-          <div className="grid grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardSizeMap[cardSize]}, 1fr))` }}>
             {filtered.map(item => {
               const agotado = item.maxStock <= 0;
               return (
@@ -154,26 +232,27 @@ export function POSScreen() {
                   className={`bg-gray-800 border ${agotado ? 'border-red-900/50 opacity-50' : 'border-gray-700 hover:bg-gray-700 cursor-pointer'} rounded-lg p-4 transition-colors flex flex-col justify-between min-h-[120px]`}
                   onClick={() => {
                     if (!agotado) {
-                      cart.addItem({ id: item.id, nombre: item.nombre, tipo: item.tipo, precio: item.precio })
+                      cart.addItem({ id: item.id, nombre: item.nombre, tipo: item.tipo, precio: item.precio, costo: item.costo })
                     }
                   }}
+                  title={item.nombre}
                 >
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex justify-between items-start mb-2 gap-2">
-                      <span className="font-bold line-clamp-2">{item.nombre}</span>
-                      <div className="flex flex-col gap-1 items-end">
-                        <Badge variant={item.tipo === 'receta' ? 'default' : 'secondary'}>
+                      <span className="font-bold line-clamp-2 min-w-0 text-sm sm:text-base leading-tight flex-1">{item.nombre}</span>
+                      <div className="flex flex-col gap-1 items-end shrink-0">
+                        <Badge variant={item.tipo === 'receta' ? 'default' : 'secondary'} className="text-[10px] px-1 py-0 h-4">
                           {item.tipo}
                         </Badge>
-                        {agotado && <Badge variant="destructive" className="text-[10px]">Agotado</Badge>}
+                        {agotado && <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">Agotado</Badge>}
                       </div>
                     </div>
                   </div>
-                  <div className="flex justify-between items-end">
-                    <div className="text-xl font-bold text-blue-400">
+                  <div className="flex justify-between items-end gap-2 flex-wrap mt-2">
+                    <div className={cn("font-bold text-blue-400 shrink-0", cardSize === 'chico' ? "text-base" : "text-xl")}>
                       ${item.precio.toFixed(2)}
                     </div>
-                    {!agotado && <div className="text-xs text-gray-500">Stock: {item.maxStock}</div>}
+                    {!agotado && <div className="text-[11px] sm:text-xs text-gray-500 whitespace-nowrap">Stock: {item.maxStock}</div>}
                   </div>
                 </div>
               )
@@ -183,8 +262,8 @@ export function POSScreen() {
       </div>
 
       {/* Carrito (Derecha) */}
-      <div className="w-96 bg-gray-900 border border-gray-800 rounded-lg flex flex-col">
-        <div className="p-4 border-b border-gray-800">
+      <div className="w-full md:w-80 lg:w-[420px] md:min-w-[300px] md:shrink-0 bg-gray-900 border border-gray-800 rounded-lg flex flex-col h-1/2 md:h-full">
+        <div className="p-3 md:p-4 border-b border-gray-800 shrink-0">
           <h3 className="text-lg font-bold">Ticket Actual</h3>
         </div>
         
@@ -233,7 +312,7 @@ export function POSScreen() {
           </div>
         </ScrollArea>
         
-        <div className="p-4 bg-gray-950/50 border-t border-gray-800 rounded-b-lg space-y-4">
+        <div className="p-3 md:p-4 bg-gray-950/50 border-t border-gray-800 rounded-b-lg space-y-3 shrink-0">
           {ivaInfo.activo && cart.items.length > 0 && (
             <div className="flex flex-col gap-1 text-sm text-gray-400 mb-2 border-b border-gray-800 pb-2">
               <div className="flex justify-between">
@@ -246,9 +325,41 @@ export function POSScreen() {
               </div>
             </div>
           )}
+          {cart.items.length > 0 && (
+            <div className="flex justify-between items-center text-sm font-medium border-b border-gray-800 pb-2 mb-2">
+              <span>Subtotal Productos:</span>
+              <span>${cart.getTotal().toFixed(2)}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 mb-4 border-b border-gray-800 pb-2">
+            <div className="flex justify-between items-center text-sm font-medium">
+              <span className="flex items-center gap-2">
+                Envío (Delivery):
+                <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => setShowDeliveryInput(!showDeliveryInput)}>
+                  {showDeliveryInput ? 'Ocultar' : 'Agregar'}
+                </Button>
+              </span>
+              <span>${(parseFloat(costoDelivery) || 0).toFixed(2)}</span>
+            </div>
+
+            {showDeliveryInput && (
+              <div className="flex justify-end mt-1">
+                <Input 
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Costo de envío"
+                  value={costoDelivery}
+                  onChange={e => setCostoDelivery(e.target.value)}
+                  className="w-32 h-8 text-right bg-gray-800 text-sm"
+                />
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-between items-center text-2xl font-bold">
             <span>Total:</span>
-            <span className="text-blue-400">${cart.getTotal().toFixed(2)}</span>
+            <span className="text-blue-400">${totalGeneral.toFixed(2)}</span>
           </div>
           
           <div className="flex gap-2">
@@ -273,21 +384,20 @@ export function POSScreen() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Monto recibido:</span>
                 <Input 
-                  type="number" 
+                  type="text" 
+                  inputMode="numeric"
                   value={montoRecibido} 
                   onChange={e => setMontoRecibido(e.target.value)} 
                   className="w-32 text-right bg-gray-800"
-                  min={cart.getTotal()}
-                  step="0.01"
                 />
               </div>
               <div className="flex justify-between items-center font-bold text-lg">
                 <span className="text-gray-300">Vuelto:</span>
-                <span className={(parseFloat(montoRecibido) || 0) < cart.getTotal() ? 'text-red-400' : 'text-green-400'}>
-                  ${Math.max(0, (parseFloat(montoRecibido) || 0) - cart.getTotal()).toFixed(2)}
+                <span className={(parseFloat(montoRecibido) || 0) < totalGeneral ? 'text-red-400' : 'text-green-400'}>
+                  ${Math.max(0, (parseFloat(montoRecibido) || 0) - totalGeneral).toFixed(2)}
                 </span>
               </div>
-              {(parseFloat(montoRecibido) || 0) < cart.getTotal() && (
+              {(parseFloat(montoRecibido) || 0) < totalGeneral && (
                 <div className="text-xs text-red-400 text-right">
                   El monto recibido es menor al total
                 </div>
@@ -296,8 +406,8 @@ export function POSScreen() {
           )}
           
           <Button 
-            className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 text-white" 
-            disabled={cart.items.length === 0 || (cart.metodoPago === 'efectivo' && (parseFloat(montoRecibido) || 0) < cart.getTotal())}
+            className="w-full h-12 md:h-14 text-base md:text-lg bg-green-600 hover:bg-green-700 text-white" 
+            disabled={(cart.items.length === 0 && (parseFloat(costoDelivery)||0) === 0) || (cart.metodoPago === 'efectivo' && (parseFloat(montoRecibido) || 0) < totalGeneral)}
             onClick={handleCobrar}
           >
             Cobrar Venta

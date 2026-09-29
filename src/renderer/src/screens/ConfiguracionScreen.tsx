@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { useLicenciaEstado } from '../App'
 
 const formSchema = z.object({
   nombreNegocio: z.string().min(1, 'Obligatorio'),
@@ -29,6 +30,7 @@ const formSchema = z.object({
 })
 
 export function ConfiguracionScreen() {
+  const estadoGlobal = useLicenciaEstado()
   const [licencia, setLicencia] = useState<any>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -72,6 +74,9 @@ export function ConfiguracionScreen() {
           licenciaVence: config.licenciaVence,
           licenciaEmail: config.licenciaEmail
         })
+        if (config.licenciaEmail) {
+          setLicenciaEmail(config.licenciaEmail)
+        }
       }
     } catch (error) {
       console.error(error)
@@ -103,8 +108,8 @@ export function ConfiguracionScreen() {
       setLicenciaLoading(true)
       const res = await (window as any).api.activarLicencia(licenciaCodigo, licenciaEmail)
       if (res.success) {
-        alert('Licencia activada correctamente')
-        await loadData() // Reload local license info
+        alert('Licencia activada/verificada correctamente. La aplicación se recargará para aplicar los cambios.')
+        window.location.reload()
       } else {
         alert('Error: ' + res.message)
       }
@@ -297,8 +302,8 @@ export function ConfiguracionScreen() {
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center py-2 border-b border-gray-800">
               <span className="font-medium text-gray-300">Estado Actual</span>
-              <Badge variant={licencia?.licenciaEstado === 'activa' ? 'default' : 'destructive'}>
-                {licencia?.licenciaEstado?.toUpperCase() || 'DESCONOCIDO'}
+              <Badge variant={estadoGlobal === 'activa' ? 'default' : 'destructive'}>
+                {estadoGlobal?.toUpperCase() || 'DESCONOCIDO'}
               </Badge>
             </div>
             
@@ -314,18 +319,41 @@ export function ConfiguracionScreen() {
               </span>
             </div>
             
-            {(licencia?.licenciaEstado === 'activa' || licencia?.licenciaEstado === 'gracia') ? (
-              <div className="pt-4">
+            <div className="pt-4 space-y-6">
+              <div className="space-y-2">
+                <span className="font-medium text-sm text-gray-300">¿Renovaste tu licencia actual vía web?</span>
+                <p className="text-xs text-gray-500">Si pagaste la renovación de este mismo email, hacé clic abajo para actualizar el estado.</p>
                 <Button 
                   variant="outline"
                   onClick={async () => {
                     setLicenciaLoading(true)
                     try {
-                      await (window as any).api.verificarRenovacionSilenciosa()
-                      await loadData()
-                      alert('Verificación completada')
+                      const oldConfig = await (window as any).api.getConfiguracion()
+                      const nuevoEstado = await (window as any).api.verificarRenovacionSilenciosa()
+                      const newConfig = await (window as any).api.getConfiguracion()
+                      
+                      if (nuevoEstado) {
+                        const oldDate = oldConfig?.licenciaVence ? new Date(oldConfig.licenciaVence).getTime() : 0
+                        const newDate = newConfig?.licenciaVence ? new Date(newConfig.licenciaVence).getTime() : 0
+                        const isDateChanged = oldDate !== newDate
+                        
+                        if (isDateChanged && nuevoEstado === 'activa') {
+                          alert('¡Renovación detectada exitosamente! Tu licencia ahora es ACTIVA. La pantalla se actualizará.')
+                          window.location.reload()
+                        } else if (nuevoEstado === 'activa') {
+                          alert('Tu licencia ya figura como ACTIVA. No se detectaron nuevos vencimientos.')
+                        } else if (nuevoEstado === 'gracia') {
+                          alert('Tu licencia se encuentra en PERÍODO DE GRACIA. Recordá renovarla vía web para evitar interrupciones.')
+                        } else if (nuevoEstado === 'bloqueada') {
+                          alert('La licencia figura como BLOQUEADA. Si ya abonaste la renovación, puede demorar unos minutos en procesarse. Intentá nuevamente en breve.')
+                        } else {
+                          alert(`Estado verificado: ${nuevoEstado.toUpperCase()}.`)
+                        }
+                      } else {
+                        alert('No se pudo establecer conexión con el servidor o no hubo respuesta. Verificá tu internet.')
+                      }
                     } catch (e: any) {
-                      alert('Error: ' + e.message)
+                      alert('Ocurrió un error inesperado al verificar: ' + e.message)
                     } finally {
                       setLicenciaLoading(false)
                     }
@@ -336,32 +364,37 @@ export function ConfiguracionScreen() {
                   {licenciaLoading ? 'Verificando...' : 'Verificar estado ahora'}
                 </Button>
               </div>
-            ) : (
-              <div className="pt-4 space-y-4">
-                <span className="font-medium text-sm text-gray-300">Activar o Renovar</span>
+
+              <div className="border-t border-gray-800 pt-4 space-y-4">
+                <div>
+                  <span className="font-medium text-sm text-gray-300">Activar nuevo código</span>
+                  <p className="text-xs text-gray-500">Si recibiste un nuevo código de activación para esta cuenta, ingresalo acá.</p>
+                </div>
                 <div className="space-y-2">
                   <Input 
                     placeholder="Tu Email" 
                     value={licenciaEmail}
-                    onChange={(e) => setLicenciaEmail(e.target.value)}
+                    disabled
+                    className="bg-gray-950 border-gray-800 opacity-50 cursor-not-allowed"
                   />
                   <div className="flex gap-2">
                     <Input 
-                      placeholder="XXXX-XXXX-XXXX-XXXX" 
+                      placeholder="BS-..." 
                       value={licenciaCodigo}
                       onChange={(e) => setLicenciaCodigo(e.target.value)}
+                      className="bg-gray-950 border-gray-800"
                     />
                     <Button 
                       onClick={handleActivarLicencia}
                       disabled={licenciaLoading || !licenciaCodigo || !licenciaEmail} 
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                      {licenciaLoading ? 'Verificando...' : 'Verificar'}
+                      {licenciaLoading ? 'Validando...' : 'Activar'}
                     </Button>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
 

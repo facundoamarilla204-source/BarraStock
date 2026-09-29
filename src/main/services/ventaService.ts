@@ -45,8 +45,8 @@ function calcularDescuentoProductoCerrado(producto: {
   return 1
 }
 
-export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 'efectivo', montoRecibido?: number, vuelto?: number) {
-  if (carrito.length === 0) {
+export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 'efectivo', montoRecibido?: number, vuelto?: number, costoDelivery?: number) {
+  if (carrito.length === 0 && !costoDelivery) {
     throw new Error('El carrito está vacío.')
   }
 
@@ -62,10 +62,14 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
   const config = await prisma.configuracion.findUnique({ where: { id: 'config' } })
   const ivaActivo = config?.ivaActivo ?? false
   const ivaPorcentaje = config?.ivaPorcentaje ?? 21
+  const porcentajeDelivery = config?.porcentajeDelivery ?? 100
+  const deliveryMonto = costoDelivery || 0
+  const pagoDelivery = deliveryMonto * (porcentajeDelivery / 100)
 
   // Ejecutamos la venta en una transacción para asegurar atomicidad
   return await prisma.$transaction(async (tx) => {
-    let totalVenta = 0
+    let totalVenta = deliveryMonto
+    let totalGananciaBruta: number | null = 0
     const detallesData: any[] = []
 
     for (const item of carrito) {
@@ -102,6 +106,10 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
         const subtotal = subtotalNeto + itemIva
         totalVenta += subtotal
 
+        const costoU = producto.costo > 0 ? producto.costo : null
+        const ganancia = costoU !== null ? subtotalNeto - (costoU * item.cantidad) : null
+        if (ganancia !== null && totalGananciaBruta !== null) totalGananciaBruta += ganancia
+
         detallesData.push({
           tipo: 'producto',
           productoId: producto.id,
@@ -109,7 +117,9 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
           precioUnitario: producto.precio + (ivaActivo ? producto.precio * (ivaPorcentaje / 100) : 0),
           subtotal,
           neto: subtotalNeto,
-          iva: itemIva
+          iva: itemIva,
+          costoUnitario: costoU,
+          ganancia
         })
       } else if (item.tipo === 'receta') {
         // Venta de receta (trago/combo)
@@ -140,10 +150,28 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
           })
         }
 
+        let costoRecetaUnitario: number | null = 0;
+        let todosTienenCosto = true;
+        for (const subItem of receta.items) {
+          if (!subItem.producto.costo || subItem.producto.costo <= 0) {
+            todosTienenCosto = false;
+          } else {
+            if (costoRecetaUnitario !== null) {
+              costoRecetaUnitario += subItem.producto.costo * subItem.cantidad;
+            }
+          }
+        }
+        if (!todosTienenCosto || receta.items.length === 0) {
+          costoRecetaUnitario = null;
+        }
+
         const subtotalNeto = receta.precio * item.cantidad
         const itemIva = ivaActivo ? subtotalNeto * (ivaPorcentaje / 100) : 0
         const subtotal = subtotalNeto + itemIva
         totalVenta += subtotal
+
+        const ganancia = costoRecetaUnitario !== null ? subtotalNeto - (costoRecetaUnitario * item.cantidad) : null
+        if (ganancia !== null && totalGananciaBruta !== null) totalGananciaBruta += ganancia
 
         detallesData.push({
           tipo: 'receta',
@@ -152,7 +180,9 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
           precioUnitario: receta.precio + (ivaActivo ? receta.precio * (ivaPorcentaje / 100) : 0),
           subtotal,
           neto: subtotalNeto,
-          iva: itemIva
+          iva: itemIva,
+          costoUnitario: costoRecetaUnitario,
+          ganancia
         })
       }
     }
@@ -176,10 +206,13 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
         neto: totalNeto,
         iva: totalIva,
         ivaPorcentaje: ivaActivo ? ivaPorcentaje : null,
+        costoDelivery: deliveryMonto,
+        pagoDelivery: pagoDelivery,
         medioPago,
         estado: 'activa',
         montoRecibido: medioPago === 'efectivo' ? montoRecibido : null,
         vuelto: medioPago === 'efectivo' ? vuelto : null,
+        gananciaBruta: totalGananciaBruta,
         detalles: {
           create: detallesData
         }
@@ -274,6 +307,7 @@ export async function getDashboardMetrics() {
 
   let totalEfectivo = 0
   let totalTransferencia = 0
+  let totalGananciaBruta = 0
   const itemsMap = new Map<string, { nombre: string, cantidad: number, totalFacturado: number }>()
 
   for (const v of ventas) {
@@ -281,6 +315,10 @@ export async function getDashboardMetrics() {
       totalEfectivo += v.total
     } else {
       totalTransferencia += v.total
+    }
+    
+    if (v.gananciaBruta) {
+      totalGananciaBruta += v.gananciaBruta
     }
 
     for (const d of v.detalles) {
@@ -304,6 +342,7 @@ export async function getDashboardMetrics() {
   return {
     totalEfectivo,
     totalTransferencia,
+    totalGananciaBruta,
     topItems
   }
 }
@@ -338,7 +377,11 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
   let totalIva = 0
   let cantidadVentas = ventas.length
 
-  const itemsMap = new Map<string, { nombre: string, tipo: string, cantidad: number, totalFacturado: number }>()
+  let totalGananciaBruta = 0
+  let totalCostoMercaderia = 0
+  let tieneCostosIncompletos = false
+
+  const itemsMap = new Map<string, { nombre: string, tipo: string, cantidad: number, totalFacturado: number, totalCosto: number, totalGanancia: number, costoIncompleto: boolean }>()
 
   for (const v of ventas) {
     totalRecaudado += v.total
@@ -351,18 +394,34 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
       totalTransferencia += v.total
     }
 
+    if (v.gananciaBruta !== null) {
+      totalGananciaBruta += v.gananciaBruta
+    }
+
     for (const d of v.detalles) {
       const id = d.tipo === 'producto' ? d.productoId! : d.recetaId!
       const nombre = d.tipo === 'producto' ? d.producto!.nombre : d.receta!.nombre
       const tipo = d.tipo === 'producto' ? 'Producto' : (d.receta!.categoria || 'Receta')
 
+      if (d.costoUnitario === null || d.ganancia === null) {
+        tieneCostosIncompletos = true
+      } else {
+        totalCostoMercaderia += (d.costoUnitario * d.cantidad)
+      }
+
       if (!itemsMap.has(id)) {
-        itemsMap.set(id, { nombre, tipo, cantidad: 0, totalFacturado: 0 })
+        itemsMap.set(id, { nombre, tipo, cantidad: 0, totalFacturado: 0, totalCosto: 0, totalGanancia: 0, costoIncompleto: false })
       }
       
       const item = itemsMap.get(id)!
       item.cantidad += d.cantidad
       item.totalFacturado += d.subtotal
+      if (d.costoUnitario === null || d.ganancia === null) {
+        item.costoIncompleto = true
+      } else {
+        item.totalCosto += (d.costoUnitario * d.cantidad)
+        item.totalGanancia += d.ganancia
+      }
     }
   }
 
@@ -377,6 +436,9 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
     totalIva,
     totalEfectivo,
     totalTransferencia,
+    totalGananciaBruta,
+    totalCostoMercaderia,
+    tieneCostosIncompletos,
     cantidadVentas,
     ticketPromedio,
     ranking,
