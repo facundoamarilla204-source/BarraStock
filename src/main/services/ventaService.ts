@@ -4,6 +4,9 @@ export type CarritoItem = {
   tipo: 'producto' | 'receta'
   id: string // ID del Producto o Receta
   cantidad: number
+  descuento?: number
+  tipoDescuento?: string
+  valorDescuento?: number
 }
 
 export const getVentas = async () => {
@@ -22,7 +25,8 @@ export const getVentas = async () => {
           producto: true,
           receta: true
         }
-      }
+      },
+      pagos: true
     },
     orderBy: {
       fecha: 'desc'
@@ -45,7 +49,17 @@ function calcularDescuentoProductoCerrado(producto: {
   return 1
 }
 
-export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 'efectivo', montoRecibido?: number, vuelto?: number, costoDelivery?: number) {
+export async function procesarVenta(
+  carrito: CarritoItem[],
+  medioPago: string = 'efectivo',
+  montoRecibido?: number,
+  vuelto?: number,
+  costoDelivery?: number,
+  pagosMultiples?: { medioPago: string, monto: number }[],
+  descuentoGlobal?: number,
+  tipoDescuentoGlobal?: string,
+  valorDescuentoGlobal?: number
+) {
   if (carrito.length === 0 && !costoDelivery) {
     throw new Error('El carrito está vacío.')
   }
@@ -68,7 +82,7 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
 
   // Ejecutamos la venta en una transacción para asegurar atomicidad
   return await prisma.$transaction(async (tx) => {
-    let totalVenta = deliveryMonto
+    let subtotalSinDescuentoGlobal = 0
     let totalGananciaBruta: number | null = 0
     const detallesData: any[] = []
 
@@ -103,11 +117,15 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
 
         const subtotalNeto = producto.precio * item.cantidad
         const itemIva = ivaActivo ? subtotalNeto * (ivaPorcentaje / 100) : 0
-        const subtotal = subtotalNeto + itemIva
-        totalVenta += subtotal
+        const subtotalOriginal = subtotalNeto + itemIva
+        const itemDescuento = item.descuento || 0
+        const subtotalFinal = subtotalOriginal - itemDescuento
+        
+        subtotalSinDescuentoGlobal += subtotalFinal
 
         const costoU = producto.costo > 0 ? producto.costo : null
-        const ganancia = costoU !== null ? subtotalNeto - (costoU * item.cantidad) : null
+        // Calculate gain based on discounted total.
+        const ganancia = costoU !== null ? (subtotalNeto - itemDescuento) - (costoU * item.cantidad) : null
         if (ganancia !== null && totalGananciaBruta !== null) totalGananciaBruta += ganancia
 
         detallesData.push({
@@ -115,7 +133,11 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
           productoId: producto.id,
           cantidad: item.cantidad,
           precioUnitario: producto.precio + (ivaActivo ? producto.precio * (ivaPorcentaje / 100) : 0),
-          subtotal,
+          subtotal: subtotalOriginal,
+          descuento: itemDescuento,
+          tipoDescuento: item.tipoDescuento,
+          valorDescuento: item.valorDescuento,
+          total: subtotalFinal,
           neto: subtotalNeto,
           iva: itemIva,
           costoUnitario: costoU,
@@ -167,10 +189,13 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
 
         const subtotalNeto = receta.precio * item.cantidad
         const itemIva = ivaActivo ? subtotalNeto * (ivaPorcentaje / 100) : 0
-        const subtotal = subtotalNeto + itemIva
-        totalVenta += subtotal
+        const subtotalOriginal = subtotalNeto + itemIva
+        const itemDescuento = item.descuento || 0
+        const subtotalFinal = subtotalOriginal - itemDescuento
+        
+        subtotalSinDescuentoGlobal += subtotalFinal
 
-        const ganancia = costoRecetaUnitario !== null ? subtotalNeto - (costoRecetaUnitario * item.cantidad) : null
+        const ganancia = costoRecetaUnitario !== null ? (subtotalNeto - itemDescuento) - (costoRecetaUnitario * item.cantidad) : null
         if (ganancia !== null && totalGananciaBruta !== null) totalGananciaBruta += ganancia
 
         detallesData.push({
@@ -178,7 +203,11 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
           recetaId: receta.id,
           cantidad: item.cantidad,
           precioUnitario: receta.precio + (ivaActivo ? receta.precio * (ivaPorcentaje / 100) : 0),
-          subtotal,
+          subtotal: subtotalOriginal,
+          descuento: itemDescuento,
+          tipoDescuento: item.tipoDescuento,
+          valorDescuento: item.valorDescuento,
+          total: subtotalFinal,
           neto: subtotalNeto,
           iva: itemIva,
           costoUnitario: costoRecetaUnitario,
@@ -196,12 +225,30 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
     // Calcular totales de IVA
     const totalNeto = detallesData.reduce((acc, d) => acc + d.neto, 0)
     const totalIva = detallesData.reduce((acc, d) => acc + d.iva, 0)
+    
+    const subtotalOriginalGlobal = detallesData.reduce((acc, d) => acc + d.subtotal, 0)
+    
+    // Apply global discount
+    const descGlobal = descuentoGlobal || 0
+    let totalVenta = subtotalSinDescuentoGlobal - descGlobal
+    if (totalVenta < 0) totalVenta = 0
+    
+    // The final global ganancia might need adjusting for global discount
+    if (totalGananciaBruta !== null && descGlobal > 0) {
+      totalGananciaBruta -= descGlobal
+    }
+    
+    totalVenta += deliveryMonto
 
     // Crear la venta
     const venta = await tx.venta.create({
       data: {
         numero: nextNumero,
         cajaSesionId: cajaAbierta.id,
+        subtotal: subtotalOriginalGlobal,
+        descuento: descGlobal,
+        tipoDescuento: tipoDescuentoGlobal,
+        valorDescuento: valorDescuentoGlobal,
         total: totalVenta,
         neto: totalNeto,
         iva: totalIva,
@@ -215,10 +262,17 @@ export async function procesarVenta(carrito: CarritoItem[], medioPago: string = 
         gananciaBruta: totalGananciaBruta,
         detalles: {
           create: detallesData
-        }
+        },
+        pagos: pagosMultiples && pagosMultiples.length > 0 ? {
+          create: pagosMultiples.map(p => ({
+            medioPago: p.medioPago,
+            monto: p.monto
+          }))
+        } : undefined
       },
       include: {
-        detalles: true
+        detalles: true,
+        pagos: true
       }
     })
 
@@ -301,20 +355,36 @@ export async function getDashboardMetrics() {
           producto: true,
           receta: true
         }
-      }
+      },
+      pagos: true
     }
   })
 
   let totalEfectivo = 0
   let totalTransferencia = 0
+  let totalDebito = 0
+  let totalCredito = 0
+  let totalQR = 0
   let totalGananciaBruta = 0
   const itemsMap = new Map<string, { nombre: string, cantidad: number, totalFacturado: number }>()
 
   for (const v of ventas) {
-    if (v.medioPago.toLowerCase() === 'efectivo') {
-      totalEfectivo += v.total
+    if (v.medioPago === 'Pago dividido' && v.pagos && v.pagos.length > 0) {
+      for (const p of v.pagos) {
+        const mp = p.medioPago.toLowerCase()
+        if (mp === 'efectivo') totalEfectivo += p.monto
+        else if (mp === 'transferencia') totalTransferencia += p.monto
+        else if (mp === 'débito' || mp === 'debito') totalDebito += p.monto
+        else if (mp === 'crédito' || mp === 'credito') totalCredito += p.monto
+        else if (mp === 'qr') totalQR += p.monto
+      }
     } else {
-      totalTransferencia += v.total
+      const mp = v.medioPago.toLowerCase()
+      if (mp === 'efectivo') totalEfectivo += v.total
+      else if (mp === 'transferencia') totalTransferencia += v.total
+      else if (mp === 'débito' || mp === 'debito') totalDebito += v.total
+      else if (mp === 'crédito' || mp === 'credito') totalCredito += v.total
+      else if (mp === 'qr') totalQR += v.total
     }
     
     if (v.gananciaBruta) {
@@ -331,7 +401,7 @@ export async function getDashboardMetrics() {
       
       const item = itemsMap.get(id)!
       item.cantidad += d.cantidad
-      item.totalFacturado += d.subtotal
+      item.totalFacturado += (d.total ?? d.subtotal)
     }
   }
 
@@ -342,6 +412,9 @@ export async function getDashboardMetrics() {
   return {
     totalEfectivo,
     totalTransferencia,
+    totalDebito,
+    totalCredito,
+    totalQR,
     totalGananciaBruta,
     topItems
   }
@@ -366,13 +439,17 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
           producto: true,
           receta: true
         }
-      }
+      },
+      pagos: true
     }
   })
 
   let totalRecaudado = 0
   let totalEfectivo = 0
   let totalTransferencia = 0
+  let totalDebito = 0
+  let totalCredito = 0
+  let totalQR = 0
   let totalNeto = 0
   let totalIva = 0
   let cantidadVentas = ventas.length
@@ -388,10 +465,22 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
     totalNeto += v.neto ?? v.total
     totalIva += v.iva ?? 0
 
-    if (v.medioPago.toLowerCase() === 'efectivo') {
-      totalEfectivo += v.total
+    if (v.medioPago === 'Pago dividido' && v.pagos && v.pagos.length > 0) {
+      for (const p of v.pagos) {
+        const mp = p.medioPago.toLowerCase()
+        if (mp === 'efectivo') totalEfectivo += p.monto
+        else if (mp === 'transferencia') totalTransferencia += p.monto
+        else if (mp === 'débito' || mp === 'debito') totalDebito += p.monto
+        else if (mp === 'crédito' || mp === 'credito') totalCredito += p.monto
+        else if (mp === 'qr') totalQR += p.monto
+      }
     } else {
-      totalTransferencia += v.total
+      const mp = v.medioPago.toLowerCase()
+      if (mp === 'efectivo') totalEfectivo += v.total
+      else if (mp === 'transferencia') totalTransferencia += v.total
+      else if (mp === 'débito' || mp === 'debito') totalDebito += v.total
+      else if (mp === 'crédito' || mp === 'credito') totalCredito += v.total
+      else if (mp === 'qr') totalQR += v.total
     }
 
     if (v.gananciaBruta !== null) {
@@ -415,7 +504,7 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
       
       const item = itemsMap.get(id)!
       item.cantidad += d.cantidad
-      item.totalFacturado += d.subtotal
+      item.totalFacturado += (d.total ?? d.subtotal)
       if (d.costoUnitario === null || d.ganancia === null) {
         item.costoIncompleto = true
       } else {
@@ -436,6 +525,9 @@ export async function getReporteAvanzado(fechaDesde: Date, fechaHasta: Date) {
     totalIva,
     totalEfectivo,
     totalTransferencia,
+    totalDebito,
+    totalCredito,
+    totalQR,
     totalGananciaBruta,
     totalCostoMercaderia,
     tieneCostosIncompletos,

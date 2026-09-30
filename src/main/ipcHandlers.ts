@@ -9,6 +9,8 @@ import { cajaService } from './services/cajaService'
 import { checkUpdatesManual, relaunchAndUpdate } from './updaterService'
 import { backupService } from './services/backupService'
 import * as proveedorService from './services/proveedorService'
+import * as authService from './services/authService'
+
 export function registerIpcHandlers() {
   // Test Ping
   ipcMain.on('ping', () => console.log('pong'))
@@ -44,6 +46,52 @@ export function registerIpcHandlers() {
   ipcMain.handle('configuracion:get', async () => await configuracionService.getConfiguracion())
   ipcMain.handle('configuracion:update', async (_, data) => await configuracionService.updateConfiguracion(data))
 
+  // Auth y Sesión
+  ipcMain.handle('auth:loginLocal', async (_, email, password) => {
+    try {
+      return await authService.loginLocal(email, password)
+    } catch (e: any) {
+      return { success: false, message: e.message }
+    }
+  })
+  
+  ipcMain.handle('auth:loginOnline', async (_, email, password, token) => {
+    try {
+      return await authService.loginOnline(email, password, token)
+    } catch (e: any) {
+      return { success: false, message: e.message }
+    }
+  })
+
+  ipcMain.handle('auth:logout', async () => {
+    await authService.logout()
+    return { success: true }
+  })
+
+  ipcMain.handle('auth:migrarCuenta', async (_, email, codigo, password) => {
+    try {
+      return await authService.migrarCuentaExistente(email, codigo, password)
+    } catch (e: any) {
+      return { success: false, message: e.message }
+    }
+  })
+
+  ipcMain.handle('auth:getDispositivos', async () => {
+    try {
+      return await authService.getDispositivos()
+    } catch (e: any) {
+      return { success: false, message: e.message }
+    }
+  })
+
+  ipcMain.handle('auth:revocarDispositivo', async (_, machineId) => {
+    try {
+      return await authService.revocarDispositivo(machineId)
+    } catch (e: any) {
+      return { success: false, message: e.message }
+    }
+  })
+
   // Licencias
   ipcMain.handle('licencia:activar', async (_, codigo, email) => {
     try {
@@ -57,9 +105,9 @@ export function registerIpcHandlers() {
   
   // Ventas
   ipcMain.handle('ventas:get', async () => await ventaService.getVentas())
-  ipcMain.handle('ventas:procesar', async (_, carrito, medioPago, montoRecibido, vuelto, costoDelivery) => {
+  ipcMain.handle('ventas:procesar', async (_, carrito, medioPago, montoRecibido, vuelto, costoDelivery, pagos, descuentoGlobal, tipoDescuentoGlobal, valorDescuentoGlobal) => {
     try {
-      return { success: true, data: await ventaService.procesarVenta(carrito, medioPago, montoRecibido, vuelto, costoDelivery) }
+      return { success: true, data: await ventaService.procesarVenta(carrito, medioPago, montoRecibido, vuelto, costoDelivery, pagos, descuentoGlobal, tipoDescuentoGlobal, valorDescuentoGlobal) }
     } catch (e: any) {
       return { success: false, message: e.message }
     }

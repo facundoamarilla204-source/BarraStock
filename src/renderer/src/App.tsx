@@ -8,7 +8,7 @@ import { RecetasScreen } from './screens/RecetasScreen'
 import { POSScreen } from './screens/POSScreen'
 import { VentasScreen } from './screens/VentasScreen'
 import { ConfiguracionScreen } from './screens/ConfiguracionScreen'
-import { ActivacionScreen } from './screens/ActivacionScreen'
+import { LoginScreen } from './screens/LoginScreen'
 import { CajaScreen } from './screens/CajaScreen'
 import { HistorialCajasScreen } from './screens/HistorialCajasScreen'
 import { ReportesScreen } from './screens/ReportesScreen'
@@ -23,56 +23,52 @@ const LicenciaContext = createContext<string>('activa')
 export const useLicenciaEstado = () => useContext(LicenciaContext)
 
 /**
- * AuthGuard — protege las rutas de la app según el estado de la licencia.
+ * AuthGuard — protege las rutas de la app.
  *
- * Al montar, ejecuta checkLicencia (que corre todo el flujo offline-first
- * del backend) y decide:
- *   - 'activa' o 'gracia' → deja pasar (gracia muestra banner en AppLayout)
- *   - 'bloqueada' → redirige a /activar, diferenciando:
- *       • Primera vez (sin email guardado) → modo 'activar' (formulario)
- *       • Licencia expirada (con email) → modo 'bloqueada' (pantalla de reintentar)
+ * Al montar, verifica:
+ *   1. Si `sesionActiva` es true (el usuario está logueado)
+ *   2. Si la licencia está en un estado válido ('activa' o 'gracia')
+ *
+ * Si la sesión no está activa → redirige a /login
+ * Si la licencia está bloqueada → redirige a /login
  */
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [estado, setEstado] = useState<string | null>(null)
-  const [tieneEmail, setTieneEmail] = useState(false)
+  const [sesionActiva, setSesionActiva] = useState<boolean | null>(null)
 
   useEffect(() => {
-    // Obtener estado local inmediatamente, con timeout de seguridad de 10s
     const timeout = new Promise<string>((_, reject) => 
       setTimeout(() => reject(new Error('Timeout de seguridad (10s)')), 10000)
     )
 
-    Promise.race([
-      (window as any).api.verificarEstadoLocal(),
-      timeout
+    // Verificar sesión y licencia en paralelo
+    Promise.all([
+      (window as any).api.getConfiguracion(),
+      Promise.race([
+        (window as any).api.verificarEstadoLocal(),
+        timeout
+      ])
     ])
-    .then((estadoLocal: string) => {
+    .then(([config, estadoLocal]: [any, string]) => {
+      setSesionActiva(config?.sesionActiva === true)
       setEstado(estadoLocal)
-      
-      // Iniciar chequeo silencioso en background DESPUÉS de resolver el estado local
-      // para evitar race conditions en Prisma o estados incorrectos en UI.
-      ;(window as any).api.verificarRenovacionSilenciosa().then((nuevoEstado: string | undefined) => {
-        if (nuevoEstado && nuevoEstado !== estadoLocal) {
-          setEstado(nuevoEstado)
-        }
-      })
+
+      // Si la sesión está activa, lanzar chequeo silencioso en background
+      if (config?.sesionActiva) {
+        ;(window as any).api.verificarRenovacionSilenciosa().then((nuevoEstado: string | undefined) => {
+          if (nuevoEstado && nuevoEstado !== estadoLocal) {
+            setEstado(nuevoEstado)
+          }
+        })
+      }
     })
     .catch((error) => {
-      console.error('Error o timeout al verificar estado local:', error)
-      // Si falla localmente por BD rota o cualquier otra cosa, lo mandamos a bloqueada/activar 
-      // para salir de la pantalla de carga infinita.
+      console.error('Error o timeout al verificar estado:', error)
       setEstado('bloqueada')
+      setSesionActiva(false)
     })
 
-    // También obtenemos la config para saber si ya se activó antes
-    ;(window as any).api.getConfiguracion().then((config: any) => {
-      setTieneEmail(!!config?.licenciaEmail)
-    }).catch(() => {
-      setTieneEmail(false)
-    })
-
-    // Chequeo periódico cada 1 hora (3600000 ms) para asegurar que
-    // el estado se actualiza si la app queda abierta 24/7
+    // Chequeo periódico cada 1 hora
     const intervalId = setInterval(() => {
       ;(window as any).api.verificarRenovacionSilenciosa().then((nuevoEstado: string | undefined) => {
         if (nuevoEstado) {
@@ -84,17 +80,17 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return () => clearInterval(intervalId)
   }, [])
 
-  if (estado === null) {
+  if (estado === null || sesionActiva === null) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-950 text-gray-400">
-        Verificando licencia...
+        Verificando sesión...
       </div>
     )
   }
 
-  if (estado === 'bloqueada') {
-    const modo = tieneEmail ? 'bloqueada' : 'activar'
-    return <Navigate to="/activar" replace state={{ modo }} />
+  // Si no hay sesión activa o la licencia está bloqueada → login
+  if (!sesionActiva || estado === 'bloqueada') {
+    return <Navigate to="/login" replace />
   }
 
   return (
@@ -108,7 +104,7 @@ function App() {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/activar" element={<ActivacionScreen />} />
+        <Route path="/login" element={<LoginScreen />} />
 
         <Route path="/" element={
           <AuthGuard>
@@ -127,6 +123,9 @@ function App() {
           <Route path="reportes" element={<ReportesScreen />} />
           <Route path="configuracion" element={<ConfiguracionScreen />} />
         </Route>
+
+        {/* Compatibilidad: si alguien tiene /activar en la URL, redirigir a /login */}
+        <Route path="/activar" element={<Navigate to="/login" replace />} />
       </Routes>
     </HashRouter>
   )

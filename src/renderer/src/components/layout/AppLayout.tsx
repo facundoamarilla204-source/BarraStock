@@ -8,6 +8,7 @@ export function AppLayout() {
   const location = useLocation()
   const estadoLicencia = useLicenciaEstado()
   const [updateReady, setUpdateReady] = useState<string | null>(null)
+  const [updateAvailable, setUpdateAvailable] = useState<string | null>(null)
   
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar_collapsed')
@@ -39,6 +40,12 @@ export function AppLayout() {
     if ((window as any).api.onUpdateReady) {
       ;(window as any).api.onUpdateReady((version: string) => {
         setUpdateReady(version)
+        setUpdateAvailable(null) // Ocultar el cartel de descargando si ya está lista
+      })
+    }
+    if ((window as any).api.onUpdateAvailable) {
+      ;(window as any).api.onUpdateAvailable((version: string) => {
+        setUpdateAvailable(version)
       })
     }
   }, [])
@@ -106,12 +113,20 @@ export function AppLayout() {
             </span>
           </div>
         )}
+        {updateAvailable && !updateReady && (
+          <div className="bg-blue-500/10 border-b border-blue-500/20 text-blue-400 p-3 flex items-center justify-center gap-2 text-sm shrink-0 shadow-sm z-50 animate-pulse">
+            <AlertTriangle className="h-4 w-4" />
+            <span>
+              Nueva actualización disponible (<b>v{updateAvailable}</b>). Descargando en segundo plano...
+            </span>
+          </div>
+        )}
         {updateReady && (
           <div className="bg-blue-600 border-b border-blue-700 text-white p-3 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm shrink-0 shadow-sm z-50">
             <span className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               <span>
-                Hay una actualización lista (<b>v{updateReady}</b>).
+                Hay una actualización lista para instalar (<b>v{updateReady}</b>).
               </span>
             </span>
             <button

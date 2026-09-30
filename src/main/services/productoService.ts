@@ -18,6 +18,7 @@ export async function createProducto(data: {
   tamanioEnvase?: number | null
   vendiblePorUnidad?: boolean
   cantidadEnvases?: number
+  imagenData?: string | null
 }) {
   // Check unique barcode
   if (data.codigoBarras) {
@@ -39,6 +40,12 @@ export async function createProducto(data: {
 
   if (stockReal < 0) throw new Error('El stock no puede ser negativo')
 
+  let imagenPath: string | null = null
+  if (data.imagenData) {
+    const { saveImage } = await import('./imageService')
+    imagenPath = await saveImage(data.imagenData)
+  }
+
   return await prisma.producto.create({
     data: {
       nombre: data.nombre,
@@ -49,7 +56,8 @@ export async function createProducto(data: {
       categoria: data.categoria,
       unidadMedida: data.unidadMedida ?? 'unidad',
       tamanioEnvase: data.tamanioEnvase ?? null,
-      vendiblePorUnidad: data.vendiblePorUnidad ?? true
+      vendiblePorUnidad: data.vendiblePorUnidad ?? true,
+      imagen: imagenPath
     }
   })
 }
@@ -68,6 +76,7 @@ export async function updateProducto(
     tamanioEnvase?: number | null
     vendiblePorUnidad?: boolean
     cantidadEnvases?: number
+    imagenData?: string | null
   }
 ) {
   // Check unique barcode
@@ -92,6 +101,27 @@ export async function updateProducto(
   if (data.cantidadEnvases != null && data.tamanioEnvase != null) {
     updateData.stock = data.cantidadEnvases * data.tamanioEnvase
   }
+
+  if (data.imagenData === null) {
+    // Delete explicit
+    const old = await prisma.producto.findUnique({ where: { id }, select: { imagen: true } })
+    if (old?.imagen) {
+      const { deleteImage } = await import('./imageService')
+      await deleteImage(old.imagen)
+    }
+    updateData.imagen = null
+  } else if (data.imagenData) {
+    // Replace with new image
+    const old = await prisma.producto.findUnique({ where: { id }, select: { imagen: true } })
+    const { saveImage, deleteImage } = await import('./imageService')
+    const newPath = await saveImage(data.imagenData)
+    if (old?.imagen) {
+      await deleteImage(old.imagen)
+    }
+    updateData.imagen = newPath
+  }
+  
+  delete updateData.imagenData
 
   return await prisma.producto.update({
     where: { id },

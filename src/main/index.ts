@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, protocol } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -10,6 +10,11 @@ import {
   confirmarRecuperacionLicencia 
 } from './services/licenciaService'
 import { runAutoMigrations } from './services/db'
+
+// Registrar protocolo antes de que la app esté lista para que respete CSP y CORS como scheme estándar
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'bs-img', privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true } }
+])
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -74,6 +79,46 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.barrastock.app')
+
+  const fs = require('fs')
+  
+  protocol.handle('bs-img', (request) => {
+    let url = request.url.slice('bs-img://'.length)
+    if (url.includes('?')) url = url.split('?')[0]
+    if (url.includes('#')) url = url.split('#')[0]
+    if (url.endsWith('/')) url = url.slice(0, -1)
+    
+    const imagesDir = join(app.getPath('userData'), 'images', 'products')
+    const filePath = join(imagesDir, decodeURIComponent(url))
+    
+    // Validar que no haya path traversal y que sea un archivo
+    if (!filePath.startsWith(imagesDir) || !fs.existsSync(filePath)) {
+      console.error(`[bs-img] Imagen no encontrada: ${filePath}`)
+      return new Response(null, { status: 404 })
+    }
+    
+    // Leer el archivo como stream
+    const stream = fs.createReadStream(filePath)
+    const webStream = new ReadableStream({
+      start(controller) {
+        stream.on('data', chunk => controller.enqueue(chunk))
+        stream.on('end', () => controller.close())
+        stream.on('error', err => controller.error(err))
+      },
+      cancel() {
+        stream.destroy()
+      }
+    })
+    
+    return new Response(webStream, {
+      headers: {
+        'Content-Type': filePath.endsWith('.webp') ? 'image/webp' : 
+                        filePath.endsWith('.png') ? 'image/png' : 
+                        filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') ? 'image/jpeg' : 
+                        'application/octet-stream'
+      }
+    })
+  })
   
   try {
     await runAutoMigrations()

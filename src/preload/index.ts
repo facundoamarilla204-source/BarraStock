@@ -36,8 +36,16 @@ const api = {
   solicitarRecuperacionLicencia: (email: string) => ipcRenderer.invoke('solicitar-recuperacion-licencia', email),
   confirmarRecuperacionLicencia: (email: string, codigo: string) => ipcRenderer.invoke('confirmar-recuperacion-licencia', email, codigo),
   
+  // Auth y Sesión
+  authLoginLocal: (email: string, password: string) => ipcRenderer.invoke('auth:loginLocal', email, password),
+  authLoginOnline: (email: string, password: string, token: string) => ipcRenderer.invoke('auth:loginOnline', email, password, token),
+  authLogout: () => ipcRenderer.invoke('auth:logout'),
+  authMigrarCuenta: (email: string, codigo: string, password: string) => ipcRenderer.invoke('auth:migrarCuenta', email, codigo, password),
+  authGetDispositivos: () => ipcRenderer.invoke('auth:getDispositivos'),
+  authRevocarDispositivo: (machineId: string) => ipcRenderer.invoke('auth:revocarDispositivo', machineId),
+
   // Ventas & Dashboard
-  procesarVenta: (carrito: any[], medioPago?: string, montoRecibido?: number, vuelto?: number, costoDelivery?: number) => ipcRenderer.invoke('ventas:procesar', carrito, medioPago, montoRecibido, vuelto, costoDelivery),
+  procesarVenta: (carrito: any[], medioPago?: string, montoRecibido?: number, vuelto?: number, costoDelivery?: number, pagos?: any[], descuentoGlobal?: number, tipoDescuentoGlobal?: string, valorDescuentoGlobal?: number) => ipcRenderer.invoke('ventas:procesar', carrito, medioPago, montoRecibido, vuelto, costoDelivery, pagos, descuentoGlobal, tipoDescuentoGlobal, valorDescuentoGlobal),
   anularVenta: (ventaId: string, motivo: string) => ipcRenderer.invoke('ventas:anular', { ventaId, motivo }),
   
   // Reportes
@@ -65,6 +73,9 @@ const api = {
   onUpdateReady: (callback: (version: string) => void) => {
     // Escuchar el evento una vez que se envíe desde main
     ipcRenderer.on('update-ready', (_event, data) => callback(data.version))
+  },
+  onUpdateAvailable: (callback: (version: string) => void) => {
+    ipcRenderer.on('update-available', (_event, data) => callback(data.version))
   },
 
   // Backup & Restore

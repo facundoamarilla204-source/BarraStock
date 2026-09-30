@@ -9,7 +9,11 @@ export const cajaService = {
     const caja = await prisma.cajaSesion.findFirst({
       where: { estado: 'abierta' },
       include: {
-        ventas: true
+        ventas: {
+          include: {
+            pagos: true
+          }
+        }
       }
     })
 
@@ -18,29 +22,50 @@ export const cajaService = {
     // Calcular totales en vivo
     let totalEfectivo = 0
     let totalTransferencia = 0
+    let totalDebito = 0
+    let totalCredito = 0
+    let totalQR = 0
     let cantidadVentas = 0
     let cantidadAnuladas = 0
 
     caja.ventas.forEach(venta => {
       if (venta.estado === 'activa') {
         cantidadVentas++
-        if (venta.medioPago.toLowerCase() === 'efectivo') {
-          totalEfectivo += venta.total
+        if (venta.medioPago === 'Pago dividido') {
+          // Si es pago dividido, sumar desde los pagos
+          // Note: we need to ensure 'pagos' are included in the query
+          if (venta.pagos && venta.pagos.length > 0) {
+            venta.pagos.forEach(p => {
+              if (p.medioPago.toLowerCase() === 'efectivo') totalEfectivo += p.monto
+              else if (p.medioPago.toLowerCase() === 'transferencia') totalTransferencia += p.monto
+              else if (p.medioPago.toLowerCase() === 'débito' || p.medioPago.toLowerCase() === 'debito') totalDebito += p.monto
+              else if (p.medioPago.toLowerCase() === 'crédito' || p.medioPago.toLowerCase() === 'credito') totalCredito += p.monto
+              else if (p.medioPago.toLowerCase() === 'qr') totalQR += p.monto
+            })
+          }
         } else {
-          totalTransferencia += venta.total
+          // Pago único
+          if (venta.medioPago.toLowerCase() === 'efectivo') totalEfectivo += venta.total
+          else if (venta.medioPago.toLowerCase() === 'transferencia') totalTransferencia += venta.total
+          else if (venta.medioPago.toLowerCase() === 'débito' || venta.medioPago.toLowerCase() === 'debito') totalDebito += venta.total
+          else if (venta.medioPago.toLowerCase() === 'crédito' || venta.medioPago.toLowerCase() === 'credito') totalCredito += venta.total
+          else if (venta.medioPago.toLowerCase() === 'qr') totalQR += venta.total
         }
       } else if (venta.estado === 'anulada') {
         cantidadAnuladas++
       }
     })
 
-    const totalVentas = totalEfectivo + totalTransferencia
+    const totalVentas = totalEfectivo + totalTransferencia + totalDebito + totalCredito + totalQR
     const totalEsperadoCaja = caja.fondoInicial + totalEfectivo
 
     return {
       ...caja,
       totalEfectivo,
       totalTransferencia,
+      totalDebito,
+      totalCredito,
+      totalQR,
       totalVentas,
       totalEsperadoCaja,
       cantidadVentas,
@@ -92,6 +117,9 @@ export const cajaService = {
         fechaCierre: new Date(),
         totalEfectivo: cajaActual.totalEfectivo,
         totalTransferencia: cajaActual.totalTransferencia,
+        totalDebito: cajaActual.totalDebito,
+        totalCredito: cajaActual.totalCredito,
+        totalQR: cajaActual.totalQR,
         totalVentas: cajaActual.totalVentas,
         totalEsperadoCaja: cajaActual.totalEsperadoCaja,
         cantidadVentas: cajaActual.cantidadVentas,
@@ -129,6 +157,7 @@ export const cajaService = {
       include: {
         ventas: {
           include: {
+            pagos: true,
             detalles: {
               include: {
                 producto: true,
@@ -164,6 +193,9 @@ export const cajaService = {
         fechaCierre: null,
         totalEfectivo: null,
         totalTransferencia: null,
+        totalDebito: null,
+        totalCredito: null,
+        totalQR: null,
         totalVentas: null,
         totalEsperadoCaja: null,
         cantidadVentas: null,

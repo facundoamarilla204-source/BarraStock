@@ -151,6 +151,9 @@ export function CajaScreen() {
                 <div className="space-y-2 mt-4 text-gray-300">
                 <p>Total Efectivo Vendido: ${(ultimaCaja.totalEfectivo || 0).toFixed(2)}</p>
                 <p>Total Transferencia Vendido: ${(ultimaCaja.totalTransferencia || 0).toFixed(2)}</p>
+                <p>Total Débito Vendido: ${(ultimaCaja.totalDebito || 0).toFixed(2)}</p>
+                <p>Total Crédito Vendido: ${(ultimaCaja.totalCredito || 0).toFixed(2)}</p>
+                <p>Total QR Vendido: ${(ultimaCaja.totalQR || 0).toFixed(2)}</p>
                 <p>Total Esperado en Caja: ${(ultimaCaja.totalEsperadoCaja || 0).toFixed(2)}</p>
               </div>
               </div>
@@ -184,7 +187,7 @@ export function CajaScreen() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
               <p className="text-gray-400 text-sm">Fondo Inicial</p>
               <p className="text-2xl font-bold">${(caja.fondoInicial || 0).toFixed(2)}</p>
@@ -197,6 +200,21 @@ export function CajaScreen() {
             <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
               <p className="text-gray-400 text-sm">Transferencias Hoy</p>
               <p className="text-2xl font-bold text-blue-400">${(caja.totalTransferencia || 0).toFixed(2)}</p>
+            </div>
+            
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <p className="text-gray-400 text-sm">Débito Hoy</p>
+              <p className="text-2xl font-bold text-blue-400">${(caja.totalDebito || 0).toFixed(2)}</p>
+            </div>
+
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <p className="text-gray-400 text-sm">Crédito Hoy</p>
+              <p className="text-2xl font-bold text-blue-400">${(caja.totalCredito || 0).toFixed(2)}</p>
+            </div>
+
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <p className="text-gray-400 text-sm">QR Hoy</p>
+              <p className="text-2xl font-bold text-blue-400">${(caja.totalQR || 0).toFixed(2)}</p>
             </div>
 
             <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">

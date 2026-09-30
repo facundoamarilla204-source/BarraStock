@@ -143,7 +143,7 @@ function PantallaActivacion({ onIrARecuprar }: { onIrARecuprar: () => void }) {
                   onClick={onIrARecuprar}
                   className="text-sm text-blue-400 hover:text-blue-300 transition-colors bg-transparent border-none cursor-pointer"
                 >
-                  ¿Ya tenías licencia pero cambiaste de compu? Recuperala acá
+                  ¿Ya tenés licencia? Iniciar sesión con un código único
                 </button>
               </div>
             </form>

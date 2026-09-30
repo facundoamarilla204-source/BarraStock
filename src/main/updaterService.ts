@@ -12,7 +12,10 @@ export function setupAutoUpdater(mainWindow: BrowserWindow) {
 
   // Eventos
   autoUpdater.on('checking-for-update', () => log.info('[Updater] Checking for update...'))
-  autoUpdater.on('update-available', (info) => log.info(`[Updater] Update available: ${info.version}`))
+  autoUpdater.on('update-available', (info) => {
+    log.info(`[Updater] Update available: ${info.version}`)
+    mainWindow.webContents.send('update-available', { version: info.version })
+  })
   autoUpdater.on('update-not-available', () => log.info('[Updater] Update not available.'))
   
   autoUpdater.on('error', (err) => {

@@ -30,26 +30,27 @@ datasource db {
 // El stock siempre vive en la unidad base (ml, gr, o cantidad de unidades).
 // ------------------------------------------------
 model Producto {
-  id                String        @id @default(cuid())
-  nombre            String
-  codigoBarras      String?       @unique
-  stock             Float         @default(0)       // siempre en unidad base (ml, gr, o unidades)
-  precio            Float         @default(0)
-  costo             Float         @default(0)
-  categoria         String?
-  activo            Boolean       @default(true)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id           String   @id @default(cuid())
+  nombre       String
+  codigoBarras String?  @unique
+  stock        Float    @default(0) // siempre en unidad base (ml, gr, o unidades)
+  precio       Float    @default(0)
+  costo        Float    @default(0)
+  categoria    String?
+  imagen       String?
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Campos de unificación (ex-Ingrediente)
-  unidadMedida      String        @default("unidad") // "ml" | "gr" | "unidad"
-  tamanioEnvase     Float?                            // solo si unidadMedida es ml o gr (ej: 1000 para botella de 1L)
-  vendiblePorUnidad Boolean       @default(true)      // si aparece en el POS como ítem directo
+  unidadMedida      String  @default("unidad") // "ml" | "gr" | "unidad"
+  tamanioEnvase     Float? // solo si unidadMedida es ml o gr (ej: 1000 para botella de 1L)
+  vendiblePorUnidad Boolean @default(true) // si aparece en el POS como ítem directo
 
-  recetaItems       RecetaItem[]
-  detalleVentas     DetalleVenta[]
-  proveedores       ProductoProveedor[]
-  detallesCompra    DetalleCompra[]
+  recetaItems    RecetaItem[]
+  detalleVentas  DetalleVenta[]
+  proveedores    ProductoProveedor[]
+  detallesCompra DetalleCompra[]
 
   @@index([nombre])
 }
@@ -60,13 +61,13 @@ model Producto {
 // La categoría define solo la agrupación visual en el POS.
 // ------------------------------------------------
 model Receta {
-  id            String           @id @default(cuid())
-  nombre        String
-  categoria     String
-  precio        Float
-  activa        Boolean          @default(true)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id        String   @id @default(cuid())
+  nombre    String
+  categoria String
+  precio    Float
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   items         RecetaItem[]
   detalleVentas DetalleVenta[]
@@ -80,15 +81,15 @@ model Receta {
 // con su cantidad y unidad.
 // ------------------------------------------------
 model RecetaItem {
-  id             String        @id @default(cuid())
-  recetaId       String
-  receta         Receta        @relation(fields: [recetaId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  recetaId String
+  receta   Receta @relation(fields: [recetaId], references: [id], onDelete: Cascade)
 
-  productoId     String
-  producto       Producto      @relation(fields: [productoId], references: [id])
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
 
-  cantidad       Float
-  unidad         String
+  cantidad Float
+  unidad   String
 
   @@index([recetaId])
   @@index([productoId])
@@ -99,23 +100,26 @@ model RecetaItem {
 // Turno o sesión de caja. Agrupa ventas.
 // ------------------------------------------------
 model CajaSesion {
-  id              String       @id @default(cuid())
-  numero          Int          @unique // correlativo legible
+  id     String @id @default(cuid())
+  numero Int    @unique // correlativo legible
 
-  fondoInicial    Float        @default(0)
-  fechaApertura   DateTime     @default(now())
+  fondoInicial  Float    @default(0)
+  fechaApertura DateTime @default(now())
 
-  fechaCierre     DateTime?
-  totalEfectivo   Float?       // suma de ventas activas en efectivo
-  totalTransferencia Float?    // suma de ventas activas por transferencia
-  totalVentas     Float?       // totalEfectivo + totalTransferencia
-  totalEsperadoCaja Float?     // fondoInicial + totalEfectivo
-  cantidadVentas  Int?
-  cantidadAnuladas Int?
+  fechaCierre        DateTime?
+  totalEfectivo      Float? // suma de ventas activas en efectivo
+  totalTransferencia Float? // suma de ventas activas por transferencia
+  totalDebito        Float?
+  totalCredito       Float?
+  totalQR            Float?
+  totalVentas        Float? // total de todas las ventas activas
+  totalEsperadoCaja  Float? // fondoInicial + totalEfectivo
+  cantidadVentas     Int?
+  cantidadAnuladas   Int?
 
-  estado          String       @default("abierta") // "abierta" | "cerrada"
+  estado String @default("abierta") // "abierta" | "cerrada"
 
-  ventas          Venta[]
+  ventas Venta[]
 }
 
 // ------------------------------------------------
@@ -123,19 +127,26 @@ model CajaSesion {
 // Cabecera de una venta. El total y estado permiten anulación.
 // ------------------------------------------------
 model Venta {
-  id          String         @id @default(cuid())
-  numero      Int?
+  id           String      @id @default(cuid())
+  numero       Int?
   cajaSesionId String?
-  cajaSesion  CajaSesion?    @relation(fields: [cajaSesionId], references: [id])
-  
-  fecha       DateTime       @default(now())
-  total       Float
-  medioPago   String
-  estado      String         @default("activa")
-  anuladaEn   DateTime?
+  cajaSesion   CajaSesion? @relation(fields: [cajaSesionId], references: [id])
+
+  fecha DateTime @default(now())
+
+  // Descuentos
+  subtotal       Float?  @default(0)
+  descuento      Float?  @default(0)
+  tipoDescuento  String?
+  valorDescuento Float?
+
+  total           Float
+  medioPago       String
+  estado          String    @default("activa")
+  anuladaEn       DateTime?
   motivoAnulacion String?
-  montoRecibido Float?
-  vuelto        Float?
+  montoRecibido   Float?
+  vuelto          Float?
 
   // IVA
   neto          Float?
@@ -143,16 +154,32 @@ model Venta {
   ivaPorcentaje Float?
 
   // Delivery
-  costoDelivery Float?         @default(0)
-  pagoDelivery  Float?         @default(0)
+  costoDelivery Float? @default(0)
+  pagoDelivery  Float? @default(0)
 
   // Rentabilidad
   gananciaBruta Float?
 
-  detalles    DetalleVenta[]
+  detalles DetalleVenta[]
+  pagos    PagoVenta[]
 
   @@index([fecha])
   @@index([estado])
+}
+
+// ------------------------------------------------
+// PAGO_VENTA
+// Pagos asociados a una venta (pago dividido)
+// ------------------------------------------------
+model PagoVenta {
+  id        String   @id @default(cuid())
+  ventaId   String
+  venta     Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  medioPago String
+  monto     Float
+  fecha     DateTime @default(now())
+
+  @@index([ventaId])
 }
 
 // ------------------------------------------------
@@ -161,29 +188,35 @@ model Venta {
 // nunca ambos — el tipo indica cuál corresponde.
 // ------------------------------------------------
 model DetalleVenta {
-  id             String            @id @default(cuid())
-  ventaId        String
-  venta          Venta             @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  ventaId String
+  venta   Venta  @relation(fields: [ventaId], references: [id], onDelete: Cascade)
 
-  tipo           String
+  tipo String
 
-  productoId     String?
-  producto       Producto?         @relation(fields: [productoId], references: [id])
+  productoId String?
+  producto   Producto? @relation(fields: [productoId], references: [id])
 
-  recetaId       String?
-  receta         Receta?           @relation(fields: [recetaId], references: [id])
+  recetaId String?
+  receta   Receta? @relation(fields: [recetaId], references: [id])
 
   cantidad       Float
   precioUnitario Float
   subtotal       Float
 
+  // Descuentos
+  descuento      Float?  @default(0)
+  tipoDescuento  String?
+  valorDescuento Float?
+  total          Float? // subtotal - descuento
+
   // IVA
-  neto           Float?
-  iva            Float?
+  neto Float?
+  iva  Float?
 
   // Rentabilidad
-  costoUnitario  Float?
-  ganancia       Float?
+  costoUnitario Float?
+  ganancia      Float?
 
   @@index([ventaId])
   @@index([productoId])
@@ -196,22 +229,27 @@ model DetalleVenta {
 // Incluye datos de licencia (offline-first).
 // ------------------------------------------------
 model Configuracion {
-  id                     String          @id @default("config") // fuerza singleton
-  nombreNegocio          String          @default("Mi Negocio")
-  moneda                 String          @default("ARS")
-  ivaActivo              Boolean         @default(false)
-  ivaPorcentaje          Float           @default(21)
-  porcentajeAlertaStock  Float           @default(10) // % general de stock mínimo
-  porcentajeDelivery     Float           @default(100) // % del costo de envío que va al repartidor
+  id                    String  @id @default("config") // fuerza singleton
+  nombreNegocio         String  @default("Mi Negocio")
+  moneda                String  @default("ARS")
+  ivaActivo             Boolean @default(false)
+  ivaPorcentaje         Float   @default(21)
+  porcentajeAlertaStock Float   @default(10) // % general de stock mínimo
+  porcentajeDelivery    Float   @default(100) // % del costo de envío que va al repartidor
 
   // Licencia
-  licenciaEmail          String?
-  licenciaCodigo         String?
-  licenciaVence          DateTime?
-  licenciaEstado         String          @default("bloqueada")
-  licenciaUltimoCheck    DateTime?
+  licenciaEmail       String?
+  licenciaCodigo      String?
+  licenciaVence       DateTime?
+  licenciaEstado      String    @default("bloqueada")
+  licenciaUltimoCheck DateTime?
 
-  updatedAt              DateTime        @updatedAt
+  // Autenticación y Sesión Offline
+  sesionActiva      Boolean @default(false)
+  passwordHashLocal String?
+  machineId         String?
+
+  updatedAt DateTime @updatedAt
 }
 
 // ------------------------------------------------
@@ -227,8 +265,8 @@ model Proveedor {
   email           String?
   direccion       String?
   localidad       String?
-  tipo            String?  // Bebidas, Alimentos, Insumos, etc.
-  condicionPago   String?  // Contado, Cuenta Corriente
+  tipo            String? // Bebidas, Alimentos, Insumos, etc.
+  condicionPago   String? // Contado, Cuenta Corriente
   diasVencimiento Int?     @default(0)
   limiteCredito   Float?   @default(0)
   notas           String?
@@ -236,87 +274,87 @@ model Proveedor {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  compras         Compra[]
-  pagos           PagoProveedor[]
-  movimientos     ProveedorMovimiento[]
-  productos       ProductoProveedor[]
+  compras     Compra[]
+  pagos       PagoProveedor[]
+  movimientos ProveedorMovimiento[]
+  productos   ProductoProveedor[]
 }
 
 model Compra {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   proveedorId      String
   proveedor        Proveedor @relation(fields: [proveedorId], references: [id])
-  fecha            DateTime @default(now())
+  fecha            DateTime  @default(now())
   numero           String?
-  total            Float    @default(0)
-  importePagado    Float    @default(0)
-  saldoPendiente   Float    @default(0)
-  estado           String   @default("pendiente") // pendiente, parcial, pagada, anulada
+  total            Float     @default(0)
+  importePagado    Float     @default(0)
+  saldoPendiente   Float     @default(0)
+  estado           String    @default("pendiente") // pendiente, parcial, pagada, anulada
   fechaVencimiento DateTime?
   observaciones    String?
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  movimientos      ProveedorMovimiento[]
-  detalles         DetalleCompra[]
+  movimientos ProveedorMovimiento[]
+  detalles    DetalleCompra[]
 }
 
 model DetalleCompra {
-  id             String   @id @default(cuid())
-  compraId       String
-  compra         Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  productoId     String
-  producto       Producto @relation(fields: [productoId], references: [id])
-  
-  cantidad       Float
-  costoUnitario  Float
-  subtotal       Float
+  id         String   @id @default(cuid())
+  compraId   String
+  compra     Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
+
+  cantidad      Float
+  costoUnitario Float
+  subtotal      Float
 }
 
 model PagoProveedor {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   proveedorId   String
   proveedor     Proveedor @relation(fields: [proveedorId], references: [id])
-  fecha         DateTime @default(now())
+  fecha         DateTime  @default(now())
   importe       Float
   medioPago     String
   referencia    String?
   observaciones String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  movimientos   ProveedorMovimiento[]
+  movimientos ProveedorMovimiento[]
 }
 
 model ProveedorMovimiento {
-  id              String   @id @default(cuid())
-  proveedorId     String
-  proveedor       Proveedor @relation(fields: [proveedorId], references: [id])
-  
-  compraId        String?
-  compra          Compra?   @relation(fields: [compraId], references: [id])
-  
-  pagoId          String?
-  pago            PagoProveedor? @relation(fields: [pagoId], references: [id])
+  id          String    @id @default(cuid())
+  proveedorId String
+  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
+
+  compraId String?
+  compra   Compra? @relation(fields: [compraId], references: [id])
+
+  pagoId String?
+  pago   PagoProveedor? @relation(fields: [pagoId], references: [id])
 
   fecha           DateTime @default(now())
-  tipo            String   // 'COMPRA' (débito), 'PAGO' (crédito), 'AJUSTE'
+  tipo            String // 'COMPRA' (débito), 'PAGO' (crédito), 'AJUSTE'
   descripcion     String
-  monto           Float    // Positivo incrementa deuda (compra), negativo reduce deuda (pago)
+  monto           Float // Positivo incrementa deuda (compra), negativo reduce deuda (pago)
   saldoResultante Float
 }
 
 model ProductoProveedor {
-  id              String   @id @default(cuid())
-  proveedorId     String
-  proveedor       Proveedor @relation(fields: [proveedorId], references: [id])
-  productoId      String
-  producto        Producto  @relation(fields: [productoId], references: [id])
-  
-  ultimoCosto     Float?
+  id          String    @id @default(cuid())
+  proveedorId String
+  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
+  productoId  String
+  producto    Producto  @relation(fields: [productoId], references: [id])
+
+  ultimoCosto       Float?
   fechaUltimaCompra DateTime?
-  esPrincipal     Boolean   @default(false)
+  esPrincipal       Boolean   @default(false)
 
   @@unique([proveedorId, productoId])
 }

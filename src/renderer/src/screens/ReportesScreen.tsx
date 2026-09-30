@@ -58,6 +58,9 @@ export function ReportesScreen() {
         ['Total Recaudado', `$${datos.totalRecaudado.toFixed(2)}`],
         ['Efectivo', `$${datos.totalEfectivo.toFixed(2)}`],
         ['Transferencia', `$${datos.totalTransferencia.toFixed(2)}`],
+        ['Débito', `$${datos.totalDebito.toFixed(2)}`],
+        ['Crédito', `$${datos.totalCredito.toFixed(2)}`],
+        ['QR', `$${datos.totalQR.toFixed(2)}`],
         ['Cantidad Ventas', datos.cantidadVentas.toString()],
         ['Ticket Promedio', `$${datos.ticketPromedio.toFixed(2)}`]
       ],
@@ -167,7 +170,7 @@ export function ReportesScreen() {
           {tab === 'ventas' ? (
             <>
               {/* Tarjetas de Métricas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 relative overflow-hidden group">
                   <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
@@ -196,6 +199,36 @@ export function ReportesScreen() {
                   </div>
                   <p className="text-3xl font-bold text-gray-100">${datos.totalTransferencia.toFixed(2)}</p>
                   {renderBarra(datos.totalTransferencia, datos.totalRecaudado, 'bg-purple-500')}
+                </div>
+
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 relative overflow-hidden group">
+                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-blue-500/10 rounded-lg"><CreditCard className="w-5 h-5 text-blue-500" /></div>
+                    <span className="text-gray-400 font-medium text-sm">Débito</span>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-100">${datos.totalDebito.toFixed(2)}</p>
+                  {renderBarra(datos.totalDebito, datos.totalRecaudado, 'bg-blue-500')}
+                </div>
+
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 relative overflow-hidden group">
+                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-red-500/10 rounded-full blur-2xl group-hover:bg-red-500/20 transition-all"></div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-red-500/10 rounded-lg"><CreditCard className="w-5 h-5 text-red-500" /></div>
+                    <span className="text-gray-400 font-medium text-sm">Crédito</span>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-100">${datos.totalCredito.toFixed(2)}</p>
+                  {renderBarra(datos.totalCredito, datos.totalRecaudado, 'bg-red-500')}
+                </div>
+
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 relative overflow-hidden group">
+                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl group-hover:bg-yellow-500/20 transition-all"></div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-yellow-500/10 rounded-lg"><CreditCard className="w-5 h-5 text-yellow-500" /></div>
+                    <span className="text-gray-400 font-medium text-sm">QR</span>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-100">${datos.totalQR.toFixed(2)}</p>
+                  {renderBarra(datos.totalQR, datos.totalRecaudado, 'bg-yellow-500')}
                 </div>
 
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 relative overflow-hidden group">

@@ -47,6 +47,7 @@ export function VentasScreen() {
               <TableHead>Detalle</TableHead>
               <TableHead>Medio de Pago</TableHead>
               <TableHead>Total</TableHead>
+              <TableHead>Delivery</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -69,7 +70,23 @@ export function VentasScreen() {
                   </ul>
                 </TableCell>
                 <TableCell className="capitalize">{venta.medioPago}</TableCell>
-                <TableCell className="font-bold">${venta.total.toFixed(2)}</TableCell>
+                <TableCell className="font-bold">
+                  ${(venta.total || 0).toFixed(2)}
+                  {(venta.descuento || 0) > 0 && (
+                    <div className="text-xs text-blue-400 font-normal whitespace-nowrap">
+                      Desc: -${Number(venta.descuento).toFixed(2)}
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {(venta.costoDelivery || 0) > 0 ? (
+                    <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20 whitespace-nowrap">
+                      Sí (${Number(venta.costoDelivery).toFixed(2)})
+                    </Badge>
+                  ) : (
+                    <span className="text-gray-500">-</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge variant={venta.estado === 'activa' ? 'default' : 'destructive'}>
                     {venta.estado.toUpperCase()}
@@ -138,6 +155,19 @@ export function VentasScreen() {
                     <span className="text-gray-500">Anulada en:</span> {selectedVenta.anuladaEn ? new Date(selectedVenta.anuladaEn).toLocaleString() : '-'}
                   </div>
                 )}
+                {selectedVenta.medioPago === 'Pago dividido' && selectedVenta.pagos && selectedVenta.pagos.length > 0 && (
+                  <div className="col-span-2 bg-gray-900 p-3 rounded-md">
+                    <span className="text-gray-400 font-medium text-xs uppercase tracking-wider mb-2 block">Detalle de Pagos</span>
+                    <ul className="space-y-1">
+                      {selectedVenta.pagos.map((p: any, idx: number) => (
+                        <li key={idx} className="flex justify-between text-sm">
+                          <span className="capitalize text-gray-300">{p.medioPago}</span>
+                          <span className="font-medium">${(p.monto || 0).toFixed(2)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-md mt-4 overflow-x-auto">
@@ -147,7 +177,8 @@ export function VentasScreen() {
                       <TableHead>Ítem</TableHead>
                       <TableHead className="text-right">Cant.</TableHead>
                       <TableHead className="text-right">P. Unit</TableHead>
-                      <TableHead className="text-right">Subtotal</TableHead>
+                      <TableHead className="text-right">Desc.</TableHead>
+                      <TableHead className="text-right">Total Item</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -160,8 +191,11 @@ export function VentasScreen() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">{d.cantidad}</TableCell>
-                        <TableCell className="text-right">${d.precioUnitario.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">${d.subtotal.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">${(d.precioUnitario || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-right text-blue-400">
+                          {(d.descuento || 0) > 0 ? `-$${Number(d.descuento).toFixed(2)}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">${(d.total ?? d.subtotal ?? 0).toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -169,18 +203,31 @@ export function VentasScreen() {
               </div>
               
               <div className="flex flex-col items-end pt-4 gap-2">
+                <div className="text-sm text-gray-400">
+                  Subtotal: ${(selectedVenta.subtotal || 0).toFixed(2)}
+                </div>
+                {(selectedVenta.descuento || 0) > 0 && (
+                  <div className="text-sm text-blue-400">
+                    Descuento Global: -${Number(selectedVenta.descuento).toFixed(2)}
+                  </div>
+                )}
                 {selectedVenta.iva != null && selectedVenta.iva > 0 && (
                   <div className="text-sm text-gray-400 flex flex-col items-end">
                     <span>Subtotal Neto: ${selectedVenta.neto?.toFixed(2)}</span>
                     <span>IVA ({selectedVenta.ivaPorcentaje}%): ${selectedVenta.iva?.toFixed(2)}</span>
                   </div>
                 )}
+                {(selectedVenta.costoDelivery || 0) > 0 && (
+                  <div className="text-sm text-gray-400">
+                    Delivery: +${Number(selectedVenta.costoDelivery).toFixed(2)}
+                  </div>
+                )}
                 <div className="text-2xl font-bold">
-                  Total: ${selectedVenta.total.toFixed(2)}
+                  Total: ${(selectedVenta.total || 0).toFixed(2)}
                 </div>
-                {selectedVenta.medioPago === 'efectivo' && selectedVenta.montoRecibido !== null && selectedVenta.vuelto !== null && (
+                {selectedVenta.medioPago === 'efectivo' && selectedVenta.montoRecibido != null && selectedVenta.vuelto != null && (
                   <div className="text-sm text-gray-400 bg-gray-900 px-3 py-2 rounded-md border border-gray-800">
-                    Pagó con: <strong className="text-white">${selectedVenta.montoRecibido.toFixed(2)}</strong> — Vuelto: <strong className="text-green-400">${selectedVenta.vuelto.toFixed(2)}</strong>
+                    Pagó con: <strong className="text-white">${Number(selectedVenta.montoRecibido).toFixed(2)}</strong> — Vuelto: <strong className="text-green-400">${Number(selectedVenta.vuelto).toFixed(2)}</strong>
                   </div>
                 )}
               </div>

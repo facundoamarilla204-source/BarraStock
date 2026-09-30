@@ -122,7 +122,7 @@ export function DashboardScreen() {
       </div>
 
       {/* METRICAS PRINCIPALES Y MEDIOS DE PAGO */}
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Ventas de Hoy</CardTitle>
@@ -142,6 +142,17 @@ export function DashboardScreen() {
           <CardContent>
             <div className="text-2xl font-bold">${(totalHoy || 0).toFixed(2)}</div>
             <p className="text-xs text-gray-500">Total cobrado hoy</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">Ganancia Bruta Hoy</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${(metrics?.totalGananciaBruta || 0).toFixed(2)}</div>
+            <p className="text-xs text-gray-500">Ventas menos costo</p>
           </CardContent>
         </Card>
 
@@ -169,12 +180,34 @@ export function DashboardScreen() {
 
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Ganancia Bruta Hoy</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-400" />
+            <CardTitle className="text-sm font-medium text-gray-400">Débito Hoy</CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${(metrics?.totalGananciaBruta || 0).toFixed(2)}</div>
-            <p className="text-xs text-gray-500">Ventas menos costo</p>
+            <div className="text-2xl font-bold">${(metrics?.totalDebito || 0).toFixed(2)}</div>
+            <p className="text-xs text-gray-500">Ventas por débito</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">Crédito Hoy</CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${(metrics?.totalCredito || 0).toFixed(2)}</div>
+            <p className="text-xs text-gray-500">Ventas por crédito</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">QR Hoy</CardTitle>
+            <Activity className="h-4 w-4 text-blue-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${(metrics?.totalQR || 0).toFixed(2)}</div>
+            <p className="text-xs text-gray-500">Ventas por QR</p>
           </CardContent>
         </Card>
       </div>
@@ -231,7 +264,7 @@ export function DashboardScreen() {
             Top 5 Más Vendidos
           </h3>
           <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden h-[300px]">
-            {!metrics?.topVendidos || metrics.topVendidos.length === 0 ? (
+            {!metrics?.topItems || metrics.topItems.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-500">
                 No hay datos suficientes
               </div>
@@ -245,7 +278,7 @@ export function DashboardScreen() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                  {metrics.topVendidos.map((item: any, i: number) => (
+                  {metrics.topItems.map((item: any, i: number) => (
                     <tr key={i} className="hover:bg-gray-800/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-200">{item.nombre}</td>
                       <td className="px-4 py-3 text-right text-gray-300">{item.cantidad}</td>

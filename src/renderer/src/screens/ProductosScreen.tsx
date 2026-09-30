@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Camera, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
@@ -38,8 +39,16 @@ export function ProductosScreen() {
     tamanioEnvase: 0,
     cantidadEnvases: 0,
     stock: 0,
-    vendiblePorUnidad: true
+    vendiblePorUnidad: true,
+    imagen: null as string | null,
+    imagenData: null as string | null
   })
+  const [optimizando, setOptimizando] = useState(false)
+  const [infoOptimizacion, setInfoOptimizacion] = useState<{
+    originalSize: number
+    optimizedSize: number
+  } | null>(null)
+  
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [ivaInfo, setIvaInfo] = useState({ activo: false, porcentaje: 21 })
 
@@ -68,7 +77,8 @@ export function ProductosScreen() {
       categoria: formData.categoria || undefined,
       unidadMedida: formData.unidadMedida,
       vendiblePorUnidad: formData.vendiblePorUnidad,
-      tamanioEnvase: formData.unidadMedida !== 'unidad' ? (formData.tamanioEnvase || null) : null
+      tamanioEnvase: formData.unidadMedida !== 'unidad' ? (formData.tamanioEnvase || null) : null,
+      imagenData: formData.imagenData
     }
 
     if (formData.unidadMedida !== 'unidad' && formData.tamanioEnvase > 0) {
@@ -102,8 +112,11 @@ export function ProductosScreen() {
       tamanioEnvase: item.tamanioEnvase || 0,
       cantidadEnvases: envases,
       stock: item.stock,
-      vendiblePorUnidad: item.vendiblePorUnidad ?? true
+      vendiblePorUnidad: item.vendiblePorUnidad ?? true,
+      imagen: item.imagen || null,
+      imagenData: null
     })
+    setInfoOptimizacion(null)
     setIsModalOpen(true)
   }
 
@@ -125,9 +138,42 @@ export function ProductosScreen() {
       tamanioEnvase: 0,
       cantidadEnvases: 0,
       stock: 0,
-      vendiblePorUnidad: true
+      vendiblePorUnidad: true,
+      imagen: null,
+      imagenData: null
     })
+    setInfoOptimizacion(null)
     setIsModalOpen(true)
+  }
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setOptimizando(true)
+      const { optimizeImage } = await import('@/utils/imageOptimizer')
+      const result = await optimizeImage(file)
+      
+      setFormData(prev => ({ ...prev, imagenData: result.base64 }))
+      setInfoOptimizacion({
+        originalSize: result.originalSize,
+        optimizedSize: result.optimizedSize
+      })
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setOptimizando(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleRemoveImage = () => {
+    if (formData.imagen) {
+      if (!confirm('¿Querés eliminar la imagen de este producto?')) return
+    }
+    setFormData(prev => ({ ...prev, imagenData: null, imagen: null }))
+    setInfoOptimizacion(null)
   }
 
   const isLiquido = formData.unidadMedida === 'ml' || formData.unidadMedida === 'gr'
@@ -168,7 +214,18 @@ export function ProductosScreen() {
           <TableBody>
             {filtered.map((item) => (
               <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.nombre}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {item.imagen ? (
+                      <img src={`bs-img://${item.imagen}`} alt={item.nombre} className="w-8 h-8 rounded object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center text-gray-500">
+                        <Camera size={16} />
+                      </div>
+                    )}
+                    {item.nombre}
+                  </div>
+                </TableCell>
                 <TableCell>{item.categoria || '-'}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className="text-xs">
@@ -234,6 +291,57 @@ export function ProductosScreen() {
             <DialogTitle>{formData.id ? 'Editar' : 'Nuevo'} Producto</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4">
+            
+            <div className="flex justify-center mb-4">
+              <div className="relative group">
+                {formData.imagenData || formData.imagen ? (
+                  <div key="image-preview" className="relative w-32 h-32 rounded-lg overflow-hidden border border-gray-700 bg-gray-900 flex items-center justify-center">
+                    <img 
+                      src={formData.imagenData || `bs-img://${formData.imagen}`} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                      <Label htmlFor="image-upload" className="cursor-pointer bg-white/20 hover:bg-white/30 text-white p-2 rounded-full backdrop-blur-sm transition-colors">
+                        <Camera size={16} />
+                      </Label>
+                      <button type="button" onClick={handleRemoveImage} className="bg-red-500/80 hover:bg-red-500 text-white p-2 rounded-full backdrop-blur-sm transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <Label key="image-placeholder" htmlFor="image-upload" className="w-32 h-32 rounded-lg border-2 border-dashed border-gray-600 bg-gray-800/50 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-gray-800 transition-colors">
+                    {optimizando ? (
+                      <div key="optimizing" className="animate-pulse flex flex-col items-center">
+                        <span className="text-sm text-gray-400">Optimizando...</span>
+                      </div>
+                    ) : (
+                      <div key="upload-prompt" className="flex flex-col items-center">
+                        <Camera size={24} className="text-gray-400 mb-2" />
+                        <span className="text-xs text-gray-400 font-medium">Agregar imagen</span>
+                      </div>
+                    )}
+                  </Label>
+                )}
+                <input 
+                  id="image-upload" 
+                  type="file" 
+                  accept="image/jpeg,image/png,image/webp" 
+                  className="hidden" 
+                  onChange={handleImageChange}
+                  disabled={optimizando}
+                />
+              </div>
+            </div>
+
+            {infoOptimizacion && (
+              <div className="text-xs text-center text-gray-400 flex flex-col gap-0.5">
+                <span>Original: {(infoOptimizacion.originalSize / 1024).toFixed(1)} KB</span>
+                <span className="text-green-400">Optimizada: {(infoOptimizacion.optimizedSize / 1024).toFixed(1)} KB (-{Math.round((1 - infoOptimizacion.optimizedSize / infoOptimizacion.originalSize) * 100)}%)</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nombre</Label>

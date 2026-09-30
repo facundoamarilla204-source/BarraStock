@@ -20,13 +20,25 @@ class BackupService {
         String(now.getHours()).padStart(2, '0') +
         String(now.getMinutes()).padStart(2, '0')
       
-      const fileName = `barrastock-backup-${timestamp}.db`
-      const destinationFilePath = path.join(destinationFolderPath, fileName)
+      const folderName = `barrastock-backup-${timestamp}`
+      const backupFolderPath = path.join(destinationFolderPath, folderName)
       
-      // 3. Copiar el archivo
+      // Crear la carpeta del backup
+      if (!fs.existsSync(backupFolderPath)) {
+        fs.mkdirSync(backupFolderPath, { recursive: true })
+      }
+      
+      // 3. Copiar la base de datos
+      const destinationFilePath = path.join(backupFolderPath, 'barrastock.db')
       fs.copyFileSync(dbPath, destinationFilePath)
       
-      return destinationFilePath
+      // 4. Copiar las imágenes
+      const imagesPath = path.join(app.getPath('userData'), 'images')
+      if (fs.existsSync(imagesPath)) {
+        fs.cpSync(imagesPath, path.join(backupFolderPath, 'images'), { recursive: true })
+      }
+      
+      return backupFolderPath
     } catch (error: any) {
       console.error('Error al crear el backup:', error)
       throw new Error(`Error al crear el backup: ${error.message || 'Desconocido'}`)
@@ -60,6 +72,16 @@ class BackupService {
       const shmPath = `${dbPath}-shm`
       if (fs.existsSync(walPath)) fs.unlinkSync(walPath)
       if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath)
+
+      // 4.5. Restaurar imágenes si existen en el backup
+      const backupImagesPath = path.join(path.dirname(sourceFilePath), 'images')
+      if (fs.existsSync(backupImagesPath)) {
+        const destImagesPath = path.join(app.getPath('userData'), 'images')
+        if (fs.existsSync(destImagesPath)) {
+          fs.rmSync(destImagesPath, { recursive: true, force: true })
+        }
+        fs.cpSync(backupImagesPath, destImagesPath, { recursive: true })
+      }
 
       // 5. Reiniciar la app
       if (app.isPackaged) {
