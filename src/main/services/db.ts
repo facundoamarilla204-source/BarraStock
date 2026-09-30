@@ -262,6 +262,9 @@ export async function runAutoMigrations() {
     `ALTER TABLE Configuracion ADD COLUMN licenciaVence DATETIME`,
     `ALTER TABLE Configuracion ADD COLUMN licenciaEstado TEXT NOT NULL DEFAULT 'bloqueada'`,
     `ALTER TABLE Configuracion ADD COLUMN licenciaUltimoCheck DATETIME`,
+    `ALTER TABLE Configuracion ADD COLUMN sesionActiva BOOLEAN NOT NULL DEFAULT 0`,
+    `ALTER TABLE Configuracion ADD COLUMN passwordHashLocal TEXT`,
+    `ALTER TABLE Configuracion ADD COLUMN machineId TEXT`,
     
     // DetalleVenta
     `ALTER TABLE DetalleVenta ADD COLUMN neto REAL`,
