@@ -115,6 +115,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         fecha_vencimiento: licencia.fecha_vencimiento,
+        codigo_activacion: licencia.codigo_activacion,
         mensaje: esDispositivoNuevo && activos.length >= (licencia.limite_dispositivos || 1) 
                  ? 'Se ha desconectado una PC anterior por límite de dispositivos' 
                  : 'Inicio exitoso'

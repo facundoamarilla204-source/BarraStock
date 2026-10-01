@@ -79,6 +79,7 @@ export async function loginOnline(email: string, passwordString: string, supabas
 
   const data = await response.json()
   if (!response.ok || !data.success) {
+    console.error('[authService] loginOnline Edge Function Falló:', data)
     throw new Error(data.error || 'Error en autenticación online')
   }
 
@@ -92,14 +93,16 @@ export async function loginOnline(email: string, passwordString: string, supabas
       sesionActiva: true,
       passwordHashLocal: hash,
       licenciaEmail: email,
-      licenciaVence: new Date(data.fecha_vencimiento)
+      licenciaVence: new Date(data.fecha_vencimiento),
+      licenciaCodigo: data.codigo_activacion || undefined
     },
     create: { 
       id: 'config', 
       sesionActiva: true,
       passwordHashLocal: hash,
       licenciaEmail: email,
-      licenciaVence: new Date(data.fecha_vencimiento)
+      licenciaVence: new Date(data.fecha_vencimiento),
+      licenciaCodigo: data.codigo_activacion || undefined
     }
   })
 

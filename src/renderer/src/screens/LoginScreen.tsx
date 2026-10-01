@@ -17,7 +17,7 @@ const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ''
  *  - 'activar': Primer uso, pide email + contraseña + código de licencia
  */
 export function LoginScreen() {
-  const [modo, setModo] = useState<'login' | 'migracion' | 'activar'>('login')
+  const [modo, setModo] = useState<'login' | 'migracion' | 'activar' | 'recuperar'>('login')
 
   if (modo === 'migracion') {
     return <PantallaMigracion onVolver={() => setModo('login')} />
@@ -27,12 +27,16 @@ export function LoginScreen() {
     return <PantallaActivar onVolver={() => setModo('login')} />
   }
 
-  return <PantallaLogin onMigrar={() => setModo('migracion')} onActivar={() => setModo('activar')} />
+  if (modo === 'recuperar') {
+    return <PantallaRecuperar onVolver={() => setModo('login')} />
+  }
+
+  return <PantallaLogin onMigrar={() => setModo('migracion')} onActivar={() => setModo('activar')} onRecuperar={() => setModo('recuperar')} />
 }
 
 // ─── Pantalla de LOGIN ────────────────────────────────────────
 
-function PantallaLogin({ onMigrar, onActivar }: { onMigrar: () => void; onActivar: () => void }) {
+function PantallaLogin({ onMigrar, onActivar, onRecuperar }: { onMigrar: () => void; onActivar: () => void; onRecuperar: () => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -51,6 +55,7 @@ function PantallaLogin({ onMigrar, onActivar }: { onMigrar: () => void; onActiva
     try {
       // 1. Intentar login online con Supabase Auth
       if (SUPABASE_URL && SUPABASE_KEY) {
+        let isNetworkError = false
         try {
           const authRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
             method: 'POST',
@@ -59,17 +64,28 @@ function PantallaLogin({ onMigrar, onActivar }: { onMigrar: () => void; onActiva
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({ email, password })
+          }).catch(() => {
+            isNetworkError = true
+            throw new Error('Network error')
           })
 
           if (authRes.ok) {
             const authData = await authRes.json()
             // Login online exitoso — registrar dispositivo
-            const res = await (window as any).api.authLoginOnline(email, password, authData.access_token)
-            if (res.success) {
-              navigate('/', { replace: true })
-              return
-            } else {
-              setError(res.message || 'Error al registrar dispositivo')
+            try {
+              const res = await (window as any).api.authLoginOnline(email, password, authData.access_token)
+              if (res.success) {
+                navigate('/', { replace: true })
+                return
+              } else {
+                setError(res.message || 'Error al registrar dispositivo')
+                setLoading(false)
+                return
+              }
+            } catch (innerErr: any) {
+              // El IPC tiró un error desde Supabase functions
+              const msg = innerErr.message?.replace(/Error invoking remote method '.*?':\s*(Error:\s*)?/, '')
+              setError(msg || 'Error al registrar dispositivo')
               setLoading(false)
               return
             }
@@ -80,10 +96,14 @@ function PantallaLogin({ onMigrar, onActivar }: { onMigrar: () => void; onActiva
               setLoading(false)
               return
             }
-            // Otro error de servidor — intentar offline
+            // Otro error de servidor — marcamos como error de red para intentar offline
+            isNetworkError = true
           }
         } catch {
-          // Sin conexión — intentar offline
+          if (!isNetworkError) {
+            // Error inesperado que no es de red, no hacemos fallback offline
+            throw new Error('Error inesperado')
+          }
           setOfflineMode(true)
         }
       }
@@ -103,15 +123,17 @@ function PantallaLogin({ onMigrar, onActivar }: { onMigrar: () => void; onActiva
 
       setError(res.message || 'Credenciales incorrectas')
     } catch (err: any) {
-      if (err.message === 'MIGRATION_REQUIRED') {
+      if (err.message === 'MIGRATION_REQUIRED' || err.message?.includes('MIGRATION_REQUIRED')) {
         onMigrar()
         return
       }
-      setError(err.message || 'Error inesperado')
+      const msg = err.message?.replace(/Error invoking remote method '.*?':\s*(Error:\s*)?/, '')
+      setError(msg || 'Error inesperado')
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4">
@@ -183,8 +205,15 @@ function PantallaLogin({ onMigrar, onActivar }: { onMigrar: () => void; onActiva
             <div className="pt-4 space-y-2 text-center">
               <button
                 type="button"
+                onClick={onRecuperar}
+                className="text-sm text-blue-400 hover:text-blue-300 transition-colors bg-transparent border-none cursor-pointer block mx-auto font-medium"
+              >
+                Olvidé mi contraseña
+              </button>
+              <button
+                type="button"
                 onClick={onActivar}
-                className="text-sm text-blue-400 hover:text-blue-300 transition-colors bg-transparent border-none cursor-pointer block mx-auto"
+                className="text-sm text-gray-500 hover:text-gray-400 transition-colors bg-transparent border-none cursor-pointer block mx-auto pt-2"
               >
                 <KeyRound className="h-3.5 w-3.5 inline mr-1" />
                 Primera vez? Activá tu licencia acá
@@ -204,6 +233,219 @@ function PantallaLogin({ onMigrar, onActivar }: { onMigrar: () => void; onActiva
     </div>
   )
 }
+
+// ─── Pantalla de RECUPERACIÓN DE CONTRASEÑA ────────────────────
+
+function PantallaRecuperar({ onVolver }: { onVolver: () => void }) {
+  const [paso, setPaso] = useState<1 | 2>(1)
+  const [email, setEmail] = useState('')
+  const [codigo, setCodigo] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const navigate = useNavigate()
+
+  async function handleEnviarCodigo(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email) return
+    setLoading(true)
+    setError(null)
+    setSuccessMsg(null)
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      })
+      if (!res.ok) {
+        throw new Error('No se pudo enviar el código. Verificá que el email sea correcto.')
+      }
+      setPaso(2)
+      setSuccessMsg('Se ha enviado un código de 6 dígitos a tu email.')
+    } catch (err: any) {
+      setError(err.message || 'Error inesperado')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleVerificarCodigo(e: React.FormEvent) {
+    e.preventDefault()
+    if (!codigo || !password) return
+    if (password.length < 6) {
+      setError('La nueva contraseña debe tener al menos 6 caracteres')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setSuccessMsg(null)
+    try {
+      // Verificar OTP de recuperación
+      const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/verify?type=recovery`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, token: codigo, type: 'recovery' })
+      })
+      if (!verifyRes.ok) {
+        throw new Error('Código incorrecto o expirado')
+      }
+      const authData = await verifyRes.json()
+      const accessToken = authData.access_token
+
+      // Actualizar la contraseña en la nube
+      const updateRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password })
+      })
+      if (!updateRes.ok) {
+        throw new Error('Error al actualizar la contraseña')
+      }
+
+      // Registrar dispositivo y actualizar BD local
+      const loginRes = await (window as any).api.authLoginOnline(email, password, accessToken)
+      if (loginRes.success) {
+        navigate('/', { replace: true })
+      } else {
+        throw new Error(loginRes.message || 'Error al registrar dispositivo')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error inesperado')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4">
+      <Card className="w-full max-w-md bg-gray-900 border-gray-800">
+        <CardHeader className="text-center space-y-4">
+          <div className="mx-auto w-14 h-14 rounded-full bg-blue-600/10 flex items-center justify-center">
+            <KeyRound className="h-7 w-7 text-blue-400" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-gray-100">Recuperar Contraseña</CardTitle>
+          <CardDescription className="text-gray-400">
+            {paso === 1 ? 'Ingresá el email de tu cuenta para recibir un código único.' : 'Ingresá el código que recibiste y tu nueva contraseña.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {paso === 1 ? (
+            <form onSubmit={handleEnviarCodigo} className="space-y-4">
+              {error && (
+                <div className="p-3 text-sm text-red-400 bg-red-500/10 rounded-md border border-red-500/20 text-center">
+                  {error}
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-3 text-sm text-emerald-400 bg-emerald-500/10 rounded-md border border-emerald-500/20 text-center">
+                  {successMsg}
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Email</label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                  className="bg-gray-950 border-gray-800 text-gray-100"
+                  autoFocus
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-6"
+                disabled={loading || !email}
+              >
+                {loading ? 'Enviando...' : 'Enviar Código'}
+              </Button>
+              <div className="pt-4 text-center">
+                <button
+                  type="button"
+                  onClick={onVolver}
+                  className="text-sm text-gray-500 hover:text-gray-400 transition-colors bg-transparent border-none cursor-pointer"
+                >
+                  Volver al inicio de sesión
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleVerificarCodigo} className="space-y-4">
+              {error && (
+                <div className="p-3 text-sm text-red-400 bg-red-500/10 rounded-md border border-red-500/20 text-center">
+                  {error}
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-3 text-sm text-emerald-400 bg-emerald-500/10 rounded-md border border-emerald-500/20 text-center">
+                  {successMsg}
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Código Único (OTP)</label>
+                <Input
+                  value={codigo}
+                  onChange={(e) => setCodigo(e.target.value)}
+                  placeholder="Ej: 123456"
+                  className="bg-gray-950 border-gray-800 text-gray-100 text-center tracking-widest text-lg font-mono"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Nueva Contraseña</label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className="bg-gray-950 border-gray-800 text-gray-100 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 bg-transparent border-none cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-6"
+                disabled={loading || !codigo || !password}
+              >
+                {loading ? 'Verificando...' : 'Verificar y Entrar'}
+              </Button>
+              <div className="pt-4 text-center">
+                <button
+                  type="button"
+                  onClick={onVolver}
+                  className="text-sm text-gray-500 hover:text-gray-400 transition-colors bg-transparent border-none cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 
 // ─── Pantalla de MIGRACIÓN (licencia legacy sin contraseña) ────────
 
@@ -396,8 +638,11 @@ function PantallaActivar({ onVolver }: { onVolver: () => void }) {
       const loginRes = await (window as any).api.authLoginOnline(email, password, authData.access_token)
       if (loginRes.success) {
         navigate('/', { replace: true })
+        return
       } else {
         setError(loginRes.message || 'Error al registrar dispositivo')
+        setLoading(false)
+        return
       }
     } catch (err: any) {
       setError('No se pudo conectar al servidor. Verificá tu conexión a internet.')

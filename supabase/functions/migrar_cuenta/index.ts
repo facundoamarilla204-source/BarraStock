@@ -22,12 +22,15 @@ serve(async (req) => {
     }
 
     // 1. Verificar la licencia legacy
-    const { data: licencia, error: licError } = await supabaseAdmin
+    const { data: licenciaData, error: licError } = await supabaseAdmin
       .from('licencias')
-      .select('*')
-      .eq('email', email)
-      .eq('codigo', codigo)
+      .select('*, clientes!inner(*)')
+      .eq('clientes.email', email)
+      .eq('codigo_activacion', codigo)
       .single()
+    
+    // extraemos la licencia original sin la prop clientes extra
+    const licencia = licenciaData ? { ...licenciaData, clientes: undefined } : null
 
     if (licError || !licencia) {
       throw new Error('Código de licencia o correo no encontrados / inválidos')

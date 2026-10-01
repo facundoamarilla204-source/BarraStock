@@ -23,11 +23,13 @@ serve(async (req) => {
     }
 
     // 1. Obtener la licencia y validar al usuario
-    const { data: licencia, error: licError } = await supabaseAdmin
+    const { data: licenciaData, error: licError } = await supabaseAdmin
       .from('licencias')
-      .select('user_id')
-      .eq('email', email)
+      .select('user_id, clientes!inner(email)')
+      .eq('clientes.email', email)
       .single()
+
+    const licencia = licenciaData ? { user_id: licenciaData.user_id } : null
 
     if (licError || !licencia || !licencia.user_id) {
       throw new Error('Licencia o usuario no encontrados')
